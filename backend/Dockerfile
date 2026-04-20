@@ -6,18 +6,8 @@
 # - ビルド: Node で Vite アセット → PHP コンテナへ /public/build をコピー
 # =============================================================================
 
-# ---- 1) Node ステージ: Vite アセットビルド ----
-FROM node:20-alpine AS assets
-WORKDIR /app
-
-COPY package.json package-lock.json* ./
-RUN npm ci
-
-COPY . .
-RUN npm run build
-
-
-# ---- 2) Composer ステージ: 本番依存のインストール ----
+# ---- 1) Composer ステージ: 本番依存のインストール ----
+# (Vite が vendor/tightenco/ziggy を参照するため、assets より先に実行する)
 FROM composer:2 AS vendor
 WORKDIR /app
 
@@ -28,6 +18,19 @@ RUN composer install \
     --no-interaction \
     --no-scripts \
     --prefer-dist
+
+
+# ---- 2) Node ステージ: Vite アセットビルド ----
+FROM node:20-alpine AS assets
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY . .
+# Ziggy 等、resources/js から参照される vendor を取り込む
+COPY --from=vendor /app/vendor ./vendor
+RUN npm run build
 
 
 # ---- 3) ランタイム: PHP CLI + 必要な extension ----
