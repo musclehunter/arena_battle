@@ -33,11 +33,14 @@ trait CreatesArenaFixtures
 
     protected function createPlayerUser(string $email = null): User
     {
-        return User::create([
+        $user = User::create([
             'name' => 'Tester',
             'email' => $email ?? ('tester_'.uniqid().'@test.local'),
             'password' => Hash::make('password'),
         ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        return $user;
     }
 
     protected function createHouseFor(User $user, array $overrides = []): House

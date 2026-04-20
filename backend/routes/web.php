@@ -21,8 +21,8 @@ Route::get('/battles/{battle}', [BattleController::class, 'show'])->name('battle
 Route::post('/battles/{battle}/turn', [BattleController::class, 'resolveTurn'])->name('battles.turn');
 Route::post('/battles/{battle}/restart', [BattleController::class, 'restart'])->name('battles.restart');
 
-// --- 認証必須: 家門機能 ------------------------------------------
-Route::middleware('auth')->group(function () {
+// --- 認証必須 + メール認証済: 家門機能 ---------------------------
+Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/houses/create', [HouseController::class, 'create'])->name('houses.create');
     Route::post('/houses', [HouseController::class, 'store'])->name('houses.store');
     Route::get('/houses/mine', [HouseController::class, 'mine'])->name('houses.mine');
