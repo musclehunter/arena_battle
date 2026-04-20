@@ -1,0 +1,17 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Docker volumes (念のため)
+docker-compose.override.yml
+
+# Node / Laravel 側は backend/.gitignore 側に任せる

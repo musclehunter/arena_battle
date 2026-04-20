@@ -1,0 +1,43 @@
+# VCS
+.git
+.gitignore
+.gitattributes
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies (コンテナ内で再インストール)
+vendor
+node_modules
+
+# Build artifacts (Dockerfile 内で再ビルド)
+public/build
+public/hot
+
+# Test / dev tooling
+tests
+phpunit.xml
+phpunit.result.cache
+.phpunit.cache
+.phpactor.json
+_ide_helper.php
+
+# Editor
+.vscode
+.idea
+.cursor
+.zed
+
+# Logs / runtime
+storage/logs/*.log
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+!storage/**/.gitignore
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
