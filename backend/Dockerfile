@@ -63,6 +63,9 @@ ENV TZ=Asia/Tokyo \
 
 WORKDIR /app
 
+# composer バイナリを取り込む (runtime stage の dump-autoload 用)
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
 # アプリケーションコード + vendor + build 済みアセットを集約
 COPY --from=vendor /app/vendor ./vendor
 COPY . .
