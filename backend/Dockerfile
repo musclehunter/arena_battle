@@ -30,6 +30,10 @@ RUN npm ci
 COPY . .
 # Ziggy 等、resources/js から参照される vendor を取り込む
 COPY --from=vendor /app/vendor ./vendor
+
+# .env が存在しない場合のみ .env.example からコピーして Vite に読み込ませる
+# Railway の Variables に VITE_ASSET_BASE_URL が設定されていれば ENV 経由で参照される
+RUN [ -f .env ] || cp .env.example .env
 RUN npm run build
 
 
