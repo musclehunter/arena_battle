@@ -1,5 +1,6 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import CharacterIcon from '@/Components/CharacterIcon.vue';
 
 const props = defineProps({
     house: { type: Object, required: true },
@@ -54,6 +55,13 @@ const release = (characterId) => {
 
                 <div v-for="c in characters" :key="c.id"
                      class="bg-gray-900/60 rounded-lg p-3 flex items-center justify-between gap-3">
+
+                    <CharacterIcon
+                        :icon-key="c.preset.icon_key"
+                        :icon-index="c.icon_index"
+                        :alt="c.preset.name"
+                        :size="72" />
+
                     <div class="flex-1 min-w-0">
                         <div class="flex items-baseline gap-2">
                             <div class="font-semibold truncate">{{ c.name }}</div>

@@ -5,6 +5,7 @@
 - **v1.0**: 戦闘コアロジック(弱攻撃 / 強攻撃 / カウンター) → `arena_v1_architecture_ja.md`
 - **v1.1**: 家門 (House) / 雇用 (Hiring) / ゲストプレイモデル → `arena_v1_1_scope_ja.md`
 - **v1.2 / v1.2.1**: キャラクターステータス拡張(STR/VIT/DEX/INT) + ランク抽選による成長プリセット切替 → `arena_v1_2_scope_ja.md`
+- **v1.3**: キャラクター画像表示 + `CharacterIcon` コンポーネント + Cloudflare R2 アセット配信
 
 ## 技術スタック
 
@@ -96,8 +97,8 @@ docker compose exec app php artisan migrate:fresh --seed
 
 1. **`SystemAccountSeeder`** — システム用ダミーユーザー(`id=1`)。`config('arena.system_user_id')` と一致
 2. **`GuestHouseSeeder`** — ゲスト雇用の受け皿となるダミー家門(`id=1`)。`config('arena.guest_house_id')` と一致
-3. **`CharacterPresetSeeder`** — プレイヤー素体 4 種 (`hero_warrior/mage/rogue/priest`) + 敵 3 種 (`enemy_goblin/ogre/slime`)
-4. **`JobSeekerSeeder`** — 求職者 10 名を `house_id=NULL` で作成
+3. **`CharacterPresetSeeder`** — プレイヤー素体 4 種 (`hero_warrior/mage/rogue/priest`) + 敵 3 種 (`enemy_goblin/ogre/slime`)。各プリセットに `icon_key` を設定(戦士: `human_warrior_male`、その他: `null`)
+4. **`JobSeekerSeeder`** — 求職者 10 名を `house_id=NULL` で作成。`icon_index` を決定論的に割り当て(`$i % 9`)
 
 > seeder が `system_user_id` / `guest_house_id` の config と不一致になった場合は即時 `RuntimeException` が飛ぶので、`migrate:fresh` で綺麗な状態からやり直すこと。
 
@@ -219,6 +220,32 @@ docker compose exec app php artisan test
 
 テストフィクスチャは `tests/Concerns/CreatesArenaFixtures.php` に集約。
 
+## キャラクター画像 (v1.3)
+
+### アイコン仕様
+
+- **画像パス**: `{VITE_ASSET_BASE_URL}/characters/icons/400/{icon_key}_{icon_index}_400.png`
+- **`icon_key`**: `character_presets.icon_key` に保存。現在は戦士のみ `human_warrior_male`、他は `null`(枠のみ表示)
+- **`icon_index`**: `characters.icon_index` に保存。0〜8 の範囲でキャラ生成時に決定論的に割り当て
+- **画像なし**: `icon_key` が `null` のキャラはグレーのプレースホルダー枠を表示
+- 枠・背景のスタイルは `CharacterIcon.vue` に集約しており、今後レア度・強さ対応で変更可能
+
+### アセット配信 (Cloudflare R2)
+
+- 画像バイナリは `public/images/` に置かず、Cloudflare R2 に配信を任せる
+- `public/images/` は `.gitignore` 対象(git 管理外)
+- `VITE_ASSET_BASE_URL` が空の場合は同一オリジンの `/characters/...` を参照(ローカル開発時は R2 URL を設定)
+
+```
+VITE_ASSET_BASE_URL=https://pub-acec75c0c97b45aa80aaf02feacb4b8b.r2.dev
+```
+
+### 関連ファイル
+
+- `resources/js/Components/CharacterIcon.vue` — アイコン表示コンポーネント(props: `icon-key` / `icon-index` / `alt` / `size`)
+- `database/migrations/2026_04_24_000002_add_icon_index_to_characters_table.php` — `characters.icon_index` 追加
+- `character_presets.icon_key` は既存カラム
+
 ## アーキテクチャの概要
 
 ### 戦闘コア (v1.0)
@@ -324,6 +351,9 @@ docker compose exec app php artisan test
 
     SESSION_SECURE_COOKIE=true
     SESSION_SAME_SITE=lax
+
+    # Cloudflare R2 アセット配信 (画像・アイコン)
+    VITE_ASSET_BASE_URL=https://pub-acec75c0c97b45aa80aaf02feacb4b8b.r2.dev
     ```
 
 5. **`APP_KEY` 生成** (ローカルで):

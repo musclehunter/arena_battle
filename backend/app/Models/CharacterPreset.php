@@ -17,6 +17,7 @@ class CharacterPreset extends Model
         'growth_preset_key',
         'ai_type',
         'is_enemy',
+        'icon_key',
     ];
 
     protected function casts(): array

@@ -53,7 +53,9 @@ class JobSeekerController extends Controller
                     ],
                     'preset' => [
                         'name' => $c->preset->name,
+                        'icon_key' => $c->preset->icon_key,
                     ],
+                    'icon_index' => $c->icon_index,
                 ];
             })->values(),
             'viewer' => [

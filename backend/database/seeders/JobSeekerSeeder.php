@@ -49,7 +49,7 @@ class JobSeekerSeeder extends Seeder
             return;
         }
 
-        foreach (self::SEEKERS as [$presetKey, $name, $costFactor, $shareFactor, $level]) {
+        foreach (self::SEEKERS as $i => [$presetKey, $name, $costFactor, $shareFactor, $level]) {
             $preset = CharacterPreset::where('key', $presetKey)->first();
             if (! $preset) {
                 throw new RuntimeException("JobSeekerSeeder: preset '{$presetKey}' が見つかりません。CharacterPresetSeeder を先に実行してください。");
@@ -77,6 +77,7 @@ class JobSeekerSeeder extends Seeder
                     'reward_share_bp' => $rewardShareBp,
                     'gold' => $characterGold,
                     'hired_at' => null,
+                    'icon_index' => $i % 9,
                 ],
             );
         }

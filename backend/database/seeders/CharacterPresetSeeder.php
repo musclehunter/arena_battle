@@ -21,25 +21,25 @@ class CharacterPresetSeeder extends Seeder
                 'key' => 'hero_warrior', 'name' => '戦士',
                 'base_str' => 14, 'base_vit' => 14, 'base_dex' => 8, 'base_int' => 4,
                 'base_level' => 1, 'growth_preset_key' => 'warrior_normal',
-                'ai_type' => null, 'is_enemy' => false,
+                'ai_type' => null, 'is_enemy' => false, 'icon_key' => 'human_warrior_male',
             ],
             [
                 'key' => 'hero_mage', 'name' => '魔導士',
                 'base_str' => 6, 'base_vit' => 7, 'base_dex' => 9, 'base_int' => 16,
                 'base_level' => 1, 'growth_preset_key' => 'mage_normal',
-                'ai_type' => null, 'is_enemy' => false,
+                'ai_type' => null, 'is_enemy' => false, 'icon_key' => null,
             ],
             [
                 'key' => 'hero_rogue', 'name' => '盗賊',
                 'base_str' => 9, 'base_vit' => 8, 'base_dex' => 16, 'base_int' => 6,
                 'base_level' => 1, 'growth_preset_key' => 'rogue_normal',
-                'ai_type' => null, 'is_enemy' => false,
+                'ai_type' => null, 'is_enemy' => false, 'icon_key' => null,
             ],
             [
                 'key' => 'hero_priest', 'name' => '僧侶',
                 'base_str' => 8, 'base_vit' => 13, 'base_dex' => 8, 'base_int' => 12,
                 'base_level' => 1, 'growth_preset_key' => 'priest_normal',
-                'ai_type' => null, 'is_enemy' => false,
+                'ai_type' => null, 'is_enemy' => false, 'icon_key' => null,
             ],
 
             // -- 敵プリセット --
@@ -47,19 +47,19 @@ class CharacterPresetSeeder extends Seeder
                 'key' => 'enemy_goblin', 'name' => 'ゴブリン',
                 'base_str' => 10, 'base_vit' => 8, 'base_dex' => 6, 'base_int' => 2,
                 'base_level' => 1, 'growth_preset_key' => 'enemy_easy',
-                'ai_type' => 'basic', 'is_enemy' => true,
+                'ai_type' => 'basic', 'is_enemy' => true, 'icon_key' => null,
             ],
             [
                 'key' => 'enemy_ogre', 'name' => 'オーガ',
                 'base_str' => 16, 'base_vit' => 14, 'base_dex' => 4, 'base_int' => 1,
                 'base_level' => 3, 'growth_preset_key' => 'enemy_hard',
-                'ai_type' => 'basic', 'is_enemy' => true,
+                'ai_type' => 'basic', 'is_enemy' => true, 'icon_key' => null,
             ],
             [
                 'key' => 'enemy_slime', 'name' => 'スライム',
                 'base_str' => 4, 'base_vit' => 10, 'base_dex' => 4, 'base_int' => 2,
                 'base_level' => 1, 'growth_preset_key' => 'enemy_easy',
-                'ai_type' => 'basic', 'is_enemy' => true,
+                'ai_type' => 'basic', 'is_enemy' => true, 'icon_key' => null,
             ],
         ];
 

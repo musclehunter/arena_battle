@@ -88,7 +88,9 @@ class HouseController extends Controller
                     'preset' => [
                         'key' => $c->preset->key,
                         'name' => $c->preset->name,
+                        'icon_key' => $c->preset->icon_key,
                     ],
+                    'icon_index' => $c->icon_index,
                 ];
             })->values(),
             'active_battle_id' => $activeBattle?->id,

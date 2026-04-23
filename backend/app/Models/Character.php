@@ -26,6 +26,7 @@ class Character extends Model
         'gold',
         'house_id',
         'hired_at',
+        'icon_index',
     ];
 
     protected function casts(): array
@@ -43,6 +44,7 @@ class Character extends Model
             'reward_share_bp' => 'integer',
             'gold' => 'integer',
             'hired_at' => 'datetime',
+            'icon_index' => 'integer',
         ];
     }
 

@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import CharacterIcon from '@/Components/CharacterIcon.vue';
 
 const props = defineProps({
     seekers: { type: Array, required: true },
@@ -76,9 +77,16 @@ const errorMessage = computed(() =>
             <section v-else class="grid md:grid-cols-3 gap-3">
                 <div v-for="s in seekers" :key="s.id"
                      class="bg-gray-800 rounded-xl p-4 flex flex-col gap-3">
-                    <div>
-                        <div class="font-bold truncate">{{ s.name }}</div>
-                        <div class="text-xs text-gray-400">{{ s.preset.name }} / Lv.{{ s.level }}</div>
+                    <div class="flex items-center gap-3">
+                        <CharacterIcon
+                            :icon-key="s.preset.icon_key"
+                            :icon-index="s.icon_index"
+                            :alt="s.preset.name"
+                            :size="64" />
+                        <div class="min-w-0">
+                            <div class="font-bold truncate">{{ s.name }}</div>
+                            <div class="text-xs text-gray-400">{{ s.preset.name }} / Lv.{{ s.level }}</div>
+                        </div>
                     </div>
                     <div class="text-xs text-gray-400 space-y-0.5">
                         <div>HP {{ s.stats.hp_max }} / ATK {{ s.stats.atk }} / DEF {{ s.stats.def }}</div>
@@ -114,3 +122,4 @@ const errorMessage = computed(() =>
         </div>
     </div>
 </template>
+
