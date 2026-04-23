@@ -82,7 +82,7 @@ const errorMessage = computed(() =>
                             :icon-key="s.preset.icon_key"
                             :icon-index="s.icon_index"
                             :alt="s.preset.name"
-                            :size="64" />
+                            :size="100" />
                         <div class="min-w-0">
                             <div class="font-bold truncate">{{ s.name }}</div>
                             <div class="text-xs text-gray-400">{{ s.preset.name }} / Lv.{{ s.level }}</div>

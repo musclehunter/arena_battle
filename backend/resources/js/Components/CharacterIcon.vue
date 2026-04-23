@@ -3,7 +3,7 @@ const props = defineProps({
     iconKey: { type: String, default: null },
     iconIndex: { type: Number, default: 0 },
     alt: { type: String, default: '' },
-    size: { type: Number, default: 72 },
+    size: { type: Number, default: 100 },
 });
 
 const assetBase = (import.meta.env.VITE_ASSET_BASE_URL ?? '').replace(/\/$/, '');

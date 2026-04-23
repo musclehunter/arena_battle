@@ -60,7 +60,7 @@ const release = (characterId) => {
                         :icon-key="c.preset.icon_key"
                         :icon-index="c.icon_index"
                         :alt="c.preset.name"
-                        :size="72" />
+                        :size="100" />
 
                     <div class="flex-1 min-w-0">
                         <div class="flex items-baseline gap-2">
