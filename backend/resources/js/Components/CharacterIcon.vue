@@ -2,13 +2,14 @@
 const props = defineProps({
     iconKey: { type: String, default: null },
     iconIndex: { type: Number, default: 0 },
+    gender: { type: String, default: 'unknown' },
     alt: { type: String, default: '' },
     size: { type: Number, default: 100 },
 });
 
 const assetBase = (import.meta.env.VITE_ASSET_BASE_URL ?? '').replace(/\/$/, '');
 const iconUrl = props.iconKey
-    ? `${assetBase}/characters/icons/400/${props.iconKey}_${props.iconIndex}_400.png`
+    ? `${assetBase}/characters/icons/400/${props.iconKey}_${props.gender}_${props.iconIndex}_400.png`
     : null;
 </script>
 

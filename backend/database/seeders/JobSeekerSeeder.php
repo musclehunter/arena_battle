@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Gender;
 use App\Models\Character;
 use App\Models\CharacterPreset;
 use App\Services\Character\GrowthRank;
@@ -24,16 +25,16 @@ class JobSeekerSeeder extends Seeder
      * cost_factor / share_factor は 1.0 を中央値とした倍率。
      */
     private const SEEKERS = [
-        ['hero_warrior', 'アーサー',   1.00, 1.00, 1],
-        ['hero_warrior', 'ベオウルフ', 1.20, 1.10, 1],
-        ['hero_mage',    'セレス',     1.15, 1.15, 1],
-        ['hero_mage',    'ダリア',     0.90, 0.90, 1],
-        ['hero_rogue',   'エリス',     1.00, 1.05, 1],
-        ['hero_rogue',   'フィン',     0.85, 0.85, 1],
-        ['hero_priest',  'ギルバート', 1.10, 1.00, 1],
-        ['hero_priest',  'ヘレナ',     0.95, 0.95, 1],
-        ['hero_warrior', 'イヴァン',   0.80, 0.80, 1],
-        ['hero_mage',    'ジュリア',   1.30, 1.20, 1],
+        ['hero_warrior', 'アーサー',   1.00, 1.00, 1, Gender::Male],
+        ['hero_warrior', 'ベオウルフ', 1.20, 1.10, 1, Gender::Male],
+        ['hero_mage',    'セレス',     1.15, 1.15, 1, Gender::Female],
+        ['hero_mage',    'ダリア',     0.90, 0.90, 1, Gender::Female],
+        ['hero_rogue',   'エリス',     1.00, 1.05, 1, Gender::Female],
+        ['hero_rogue',   'フィン',     0.85, 0.85, 1, Gender::Male],
+        ['hero_priest',  'ギルバート', 1.10, 1.00, 1, Gender::Male],
+        ['hero_priest',  'ヘレナ',     0.95, 0.95, 1, Gender::Female],
+        ['hero_warrior', 'イヴァン',   0.80, 0.80, 1, Gender::Male],
+        ['hero_mage',    'ジュリア',   1.30, 1.20, 1, Gender::Female],
     ];
 
     public function run(): void
@@ -49,7 +50,7 @@ class JobSeekerSeeder extends Seeder
             return;
         }
 
-        foreach (self::SEEKERS as $i => [$presetKey, $name, $costFactor, $shareFactor, $level]) {
+        foreach (self::SEEKERS as $i => [$presetKey, $name, $costFactor, $shareFactor, $level, $gender]) {
             $preset = CharacterPreset::where('key', $presetKey)->first();
             if (! $preset) {
                 throw new RuntimeException("JobSeekerSeeder: preset '{$presetKey}' が見つかりません。CharacterPresetSeeder を先に実行してください。");
@@ -78,6 +79,7 @@ class JobSeekerSeeder extends Seeder
                     'gold' => $characterGold,
                     'hired_at' => null,
                     'icon_index' => $i % 9,
+                    'gender' => $gender,
                 ],
             );
         }

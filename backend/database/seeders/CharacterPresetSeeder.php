@@ -21,7 +21,7 @@ class CharacterPresetSeeder extends Seeder
                 'key' => 'hero_warrior', 'name' => '戦士',
                 'base_str' => 14, 'base_vit' => 14, 'base_dex' => 8, 'base_int' => 4,
                 'base_level' => 1, 'growth_preset_key' => 'warrior_normal',
-                'ai_type' => null, 'is_enemy' => false, 'icon_key' => 'human_warrior_male',
+                'ai_type' => null, 'is_enemy' => false, 'icon_key' => 'human_warrior',
             ],
             [
                 'key' => 'hero_mage', 'name' => '魔導士',

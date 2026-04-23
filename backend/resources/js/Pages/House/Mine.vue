@@ -59,13 +59,14 @@ const release = (characterId) => {
                     <CharacterIcon
                         :icon-key="c.preset.icon_key"
                         :icon-index="c.icon_index"
+                        :gender="c.gender"
                         :alt="c.preset.name"
                         :size="100" />
 
                     <div class="flex-1 min-w-0">
                         <div class="flex items-baseline gap-2">
                             <div class="font-semibold truncate">{{ c.name }}</div>
-                            <div class="text-xs text-gray-400">{{ c.preset.name }} / Lv.{{ c.level }}</div>
+                            <div class="text-xs text-gray-400">{{ c.preset.name }} / Lv.{{ c.level }} / {{ { male: '男', female: '女', unknown: '不明' }[c.gender] }}</div>
                         </div>
                         <div class="text-xs text-gray-400 mt-0.5">
                             HP {{ c.stats.hp_max }} / ATK {{ c.stats.atk }} / DEF {{ c.stats.def }}

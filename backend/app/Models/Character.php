@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Gender;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,6 +28,7 @@ class Character extends Model
         'house_id',
         'hired_at',
         'icon_index',
+        'gender',
     ];
 
     protected function casts(): array
@@ -45,6 +47,7 @@ class Character extends Model
             'gold' => 'integer',
             'hired_at' => 'datetime',
             'icon_index' => 'integer',
+            'gender' => Gender::class,
         ];
     }
 

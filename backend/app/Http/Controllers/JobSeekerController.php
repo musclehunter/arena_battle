@@ -56,6 +56,7 @@ class JobSeekerController extends Controller
                         'icon_key' => $c->preset->icon_key,
                     ],
                     'icon_index' => $c->icon_index,
+                    'gender' => $c->gender ? strtolower($c->gender->name) : 'unknown',
                 ];
             })->values(),
             'viewer' => [

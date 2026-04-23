@@ -81,11 +81,12 @@ const errorMessage = computed(() =>
                         <CharacterIcon
                             :icon-key="s.preset.icon_key"
                             :icon-index="s.icon_index"
+                            :gender="s.gender"
                             :alt="s.preset.name"
                             :size="100" />
                         <div class="min-w-0">
                             <div class="font-bold truncate">{{ s.name }}</div>
-                            <div class="text-xs text-gray-400">{{ s.preset.name }} / Lv.{{ s.level }}</div>
+                            <div class="text-xs text-gray-400">{{ s.preset.name }} / Lv.{{ s.level }} / {{ { male: '男', female: '女', unknown: '不明' }[s.gender] }}</div>
                         </div>
                     </div>
                     <div class="text-xs text-gray-400 space-y-0.5">
