@@ -33,6 +33,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Vite::prefetch(concurrency: 3);
+        Vite::useHotFile(storage_path('framework/vite.hot'))->prefetch(concurrency: 3);
     }
 }

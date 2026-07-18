@@ -6,7 +6,9 @@ use App\Enums\Gender;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Character extends Model
 {
@@ -15,6 +17,7 @@ class Character extends Model
         'name',
         'level',
         'exp',
+        'skill_points',
         'str',
         'vit',
         'dex',
@@ -36,6 +39,7 @@ class Character extends Model
         return [
             'level' => 'integer',
             'exp' => 'integer',
+            'skill_points' => 'integer',
             'str' => 'integer',
             'vit' => 'integer',
             'dex' => 'integer',
@@ -64,6 +68,18 @@ class Character extends Model
     public function battles(): HasMany
     {
         return $this->hasMany(Battle::class, 'player_character_id');
+    }
+
+    public function skills(): BelongsToMany
+    {
+        return $this->belongsToMany(Skill::class, 'character_skills')
+            ->withPivot('learned_at')
+            ->withTimestamps();
+    }
+
+    public function battleLogs(): HasManyThrough
+    {
+        return $this->hasManyThrough(BattleLog::class, Battle::class, 'player_character_id', 'battle_id')->orderByDesc('battle_logs.created_at');
     }
 
     // ---- 状態判定 ------------------------------------------------------

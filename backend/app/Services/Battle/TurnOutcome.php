@@ -7,7 +7,7 @@ namespace App\Services\Battle;
  */
 enum TurnOutcome: string
 {
-    /** 通常攻撃が相手に通った(弱攻撃、または非カウンター相手への強攻撃) */
+    /** 攻撃が相手に通った(弱攻撃、または非カウンター相手への強攻撃) */
     case Attacked = 'attacked';
 
     /** 強攻撃を仕掛けたが相手のカウンターで無効化された */

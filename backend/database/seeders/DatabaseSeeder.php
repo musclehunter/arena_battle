@@ -39,5 +39,9 @@ class DatabaseSeeder extends Seeder
             }
             $this->call($seeder);
         }
+
+        if (app()->environment('local')) {
+            $this->call(DemoArenaSeeder::class);
+        }
     }
 }

@@ -415,3 +415,8 @@ docker compose exec db mysql -u arena -parena arena
 # Redis CLI
 docker compose exec redis redis-cli
 ```
+
+## テスト用
+メール: demo@arenabattle.local
+パスワード: arena-demo-2026
+

@@ -6,16 +6,16 @@ class CharacterNotHireableException extends ArenaDomainException
 {
     public static function alreadyEmployed(): self
     {
-        return new self('このキャラクターは既に雇用されています。');
+        return new self('この戦士はすでに他の家門に所属しています。');
     }
 
     public static function guestAlreadyHiring(): self
     {
-        return new self('既にゲスト雇用中のキャラクターがいます。');
+        return new self('すでに一時契約中の戦士がいます。');
     }
 
     public static function notOwnedByHouse(): self
     {
-        return new self('このキャラクターは自家門に所属していません。');
+        return new self('この戦士はあなたの家門に所属していません。');
     }
 }

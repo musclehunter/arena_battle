@@ -89,12 +89,14 @@ final class LevelUpService
                 }
 
                 $inc = $preset->incrementAt((int) $character->growth_index);
-                $character->str = (int) $character->str + $inc['str'];
-                $character->vit = (int) $character->vit + $inc['vit'];
-                $character->dex = (int) $character->dex + $inc['dex'];
-                $character->int_stat = (int) $character->int_stat + $inc['int_stat'];
+                $cap = (int) config('atb.stat_cap', 1000);
+                $character->str = min($cap, (int) $character->str + $inc['str']);
+                $character->vit = min($cap, (int) $character->vit + $inc['vit']);
+                $character->dex = min($cap, (int) $character->dex + $inc['dex']);
+                $character->int_stat = min($cap, (int) $character->int_stat + $inc['int_stat']);
                 $character->exp = (int) $character->exp - $required;
                 $character->level = (int) $character->level + 1;
+                $character->skill_points = (int) $character->skill_points + 1;
                 $character->growth_index = (int) $character->growth_index + 1;
                 $applied[] = $inc;
                 $levelsGained++;

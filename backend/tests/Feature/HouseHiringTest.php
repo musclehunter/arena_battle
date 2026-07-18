@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Exceptions\Arena\HireSlotFullException;
 use App\Exceptions\Arena\InsufficientGoldException;
+use App\Models\Party;
 use App\Services\Arena\HiringService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -55,7 +56,9 @@ final class HouseHiringTest extends TestCase
     {
         $user = $this->createPlayerUser();
         $house = $this->createHouseFor($user, ['gold' => 10000]);
-        // Lv1 の枠 = 3
+        // Lv1 の枠 = 5
+        $this->createHiredCharacter($house);
+        $this->createHiredCharacter($house);
         $this->createHiredCharacter($house);
         $this->createHiredCharacter($house);
         $this->createHiredCharacter($house);
@@ -72,6 +75,8 @@ final class HouseHiringTest extends TestCase
         $user = $this->createPlayerUser();
         $house = $this->createHouseFor($user);
         $character = $this->createHiredCharacter($house, ['gold' => 234]);
+        $party = Party::create(['house_id' => $house->id, 'name' => '試験遠征隊']);
+        $party->members()->create(['character_id' => $character->id, 'slot' => 0]);
 
         $response = $this->actingAs($user)
             ->post(route('houses.release', ['character' => $character->id]));
@@ -81,6 +86,7 @@ final class HouseHiringTest extends TestCase
         $this->assertNull($fresh->house_id);
         $this->assertNull($fresh->hired_at);
         $this->assertSame(234, $fresh->gold, 'キャラの所持金は持ち逃げ');
+        $this->assertDatabaseMissing('party_members', ['party_id' => $party->id, 'character_id' => $character->id]);
     }
 
     #[Test]

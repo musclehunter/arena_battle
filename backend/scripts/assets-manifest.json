@@ -1,0 +1,85 @@
+{
+  "version": "1.0.0",
+  "baseUrl": "/images",
+  "providers": {
+    "pollinations": {
+      "type": "pollinations",
+      "endpoint": "https://image.pollinations.ai/prompt/{prompt}",
+      "defaultParams": {
+        "width": 400,
+        "height": 400,
+        "nologo": "true",
+        "seed": null
+      },
+      "description": "Free API. No API key required. Supports seed for reproducibility."
+    },
+    "openai": {
+      "type": "openai",
+      "endpoint": "https://api.openai.com/v1/images/generations",
+      "model": "dall-e-3",
+      "description": "Requires OPENAI_API_KEY environment variable."
+    },
+    "stability": {
+      "type": "stability",
+      "endpoint": "https://api.stability.ai/v2beta/stable-image/generate/sd3",
+      "description": "Requires STABILITY_API_KEY environment variable."
+    },
+    "placeholder": {
+      "type": "placeholder",
+      "description": "Generates colored SVG placeholders. No network required."
+    }
+  },
+  "categories": {
+    "characters": {
+      "outputDir": "public/images/characters/icons/400",
+      "size": { "width": 400, "height": 400 },
+      "format": "png",
+      "naming": "{icon_key}_{gender}_{icon_index}_400.png",
+      "promptTemplate": "{style} {subject}. {details}. Single character portrait, centered, facing forward, fantasy game art style, clean background, detailed digital painting, 1:1 square composition, high quality",
+      "stylePrefix": "Anime-style fantasy RPG character portrait",
+      "entries": [
+        { "icon_key": "human_warrior", "gender": "male", "indices": [0,1,2], "subject": "young male human warrior", "details": "wearing plate armor, holding sword and shield, brave expression" },
+        { "icon_key": "human_warrior", "gender": "female", "indices": [0,1,2], "subject": "young female human warrior", "details": "wearing plate armor, holding longsword, determined expression" },
+        { "icon_key": "human_mage", "gender": "male", "indices": [0,1,2], "subject": "young male human mage", "details": "wearing blue robes, holding magic staff, glowing eyes" },
+        { "icon_key": "human_mage", "gender": "female", "indices": [0,1,2], "subject": "young female human mage", "details": "wearing purple robes, holding crystal staff, mystical aura" },
+        { "icon_key": "human_rogue", "gender": "male", "indices": [0,1,2], "subject": "male human rogue", "details": "hooded leather armor, dual daggers, sneaky smile" },
+        { "icon_key": "human_rogue", "gender": "female", "indices": [0,1,2], "subject": "female human rogue", "details": "hooded cloak, bow and arrows, sharp eyes" },
+        { "icon_key": "human_priest", "gender": "male", "indices": [0,1,2], "subject": "male human priest", "details": "white and gold holy robes, holding mace and holy symbol, calm expression" },
+        { "icon_key": "human_priest", "gender": "female", "indices": [0,1,2], "subject": "female human priest", "details": "white holy robes, holding staff with glowing gem, gentle smile" },
+        { "icon_key": "enemy_goblin", "gender": "unknown", "indices": [0,1,2], "subject": "goblin warrior", "details": "small green goblin, ragged leather armor, rusty dagger, aggressive pose" },
+        { "icon_key": "enemy_ogre", "gender": "unknown", "indices": [0,1,2], "subject": "ogre brute", "details": "large gray ogre, crude club, tattered loincloth, angry expression" },
+        { "icon_key": "enemy_slime", "gender": "unknown", "indices": [0,1,2], "subject": "slime monster", "details": "translucent blue jelly creature, cute but menacing, dungeon background" }
+      ]
+    },
+    "backgrounds": {
+      "outputDir": "public/images/backgrounds",
+      "size": { "width": 1280, "height": 720 },
+      "format": "png",
+      "naming": "{name}.png",
+      "entries": [
+        { "name": "title", "prompt": "Dark fantasy colosseum arena at night, glowing torches, empty stone seats, dramatic sky, cinematic atmosphere, wide shot, 16:9, game background" },
+        { "name": "arena", "prompt": "Fantasy arena battleground, sand floor, stone walls, torches, cheering crowd silhouettes, dramatic lighting, 16:9, game background" },
+        { "name": "dungeon", "prompt": "Dark dungeon corridor, stone bricks, moss, glowing crystals, mysterious fog, 16:9, game background" },
+        { "name": "dashboard", "prompt": "Medieval fantasy house headquarters, war room, wooden table with maps, warm candlelight, 16:9, game background" }
+      ]
+    },
+    "ui": {
+      "outputDir": "public/images/ui",
+      "size": { "width": 128, "height": 128 },
+      "format": "png",
+      "naming": "{name}.png",
+      "promptTemplate": "Minimalist game UI icon, {description}, white symbol on dark circular background, fantasy RPG style, transparent-like edges, 1:1, clean design",
+      "entries": [
+        { "name": "gold", "description": "gold coin symbol" },
+        { "name": "hp", "description": "red heart health symbol" },
+        { "name": "mp", "description": "blue mana crystal symbol" },
+        { "name": "atk", "description": "crossed swords attack symbol" },
+        { "name": "def", "description": "shield defense symbol" },
+        { "name": "fire", "description": "flame fire element symbol" },
+        { "name": "wind", "description": "swirling air wind element symbol" },
+        { "name": "earth", "description": "rock earth element symbol" },
+        { "name": "water", "description": "water drop symbol" }
+      ]
+    }
+  }
+}

@@ -6,6 +6,7 @@ use App\Actions\House\CreateHouseAction;
 use App\Enums\BattleStatus;
 use App\Http\Requests\House\CreateHouseRequest;
 use App\Models\Battle;
+use App\Models\PartyBattle;
 use App\Services\Character\CharacterStats;
 use App\Services\Character\LevelUpService;
 use Illuminate\Http\RedirectResponse;
@@ -54,6 +55,14 @@ class HouseController extends Controller
             ->where('house_id', $house->id)
             ->first();
 
+        $party = $house->party ?? $house->party()->make();
+        $party->load('members.character.preset');
+
+        $activePartyBattle = PartyBattle::query()
+            ->where('status', BattleStatus::InProgress->value)
+            ->where('house_id', $house->id)
+            ->first();
+
         return Inertia::render('House/Mine', [
             'house' => [
                 'id' => $house->id,
@@ -94,7 +103,26 @@ class HouseController extends Controller
                     'gender' => $c->gender ? strtolower($c->gender->name) : 'unknown',
                 ];
             })->values(),
+            'party' => [
+                'id' => $party->id,
+                'name' => $party->name,
+                'strategy' => $party->strategy,
+                'risk' => $party->risk,
+                'members' => $party->members->map(fn ($m) => [
+                    'id' => $m->character_id,
+                    'slot' => $m->slot,
+                    'name' => $m->character?->name,
+                    'level' => $m->character?->level,
+                    'preset' => [
+                        'name' => $m->character?->preset?->name,
+                        'icon_key' => $m->character?->preset?->icon_key,
+                    ],
+                    'icon_index' => $m->character?->icon_index,
+                    'gender' => $m->character?->gender ? strtolower($m->character->gender->name) : 'unknown',
+                ])->values(),
+            ],
             'active_battle_id' => $activeBattle?->id,
+            'active_party_battle_id' => $activePartyBattle?->id,
         ]);
     }
 }

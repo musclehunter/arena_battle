@@ -36,17 +36,52 @@ services:
       - arena_net
 
   vite:
+    profiles:
+      - dev
+    environment:
+      VITE_ASSET_BASE_URL: https://pub-acec75c0c97b45aa80aaf02feacb4b8b.r2.dev
     build:
       context: ./docker/php
     container_name: arena_vite
     working_dir: /var/www/html
-    command: sh -c "if [ -f package.json ]; then npm install && npm run dev -- --host 0.0.0.0; else echo 'package.json not found. Skip.' && tail -f /dev/null; fi"
+    command: npm run dev -- --host 0.0.0.0
     ports:
       - "5173:5173"
     volumes:
       - ./backend:/var/www/html
     depends_on:
       - app
+    networks:
+      - arena_net
+
+  worker:
+    build:
+      context: ./docker/php
+    container_name: arena_worker
+    working_dir: /var/www/html
+    entrypoint: ["php"]
+    command: ["/var/www/html/scripts/atb_worker.php"]
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - app
+      - redis
+    networks:
+      - arena_net
+
+  reverb:
+    build:
+      context: ./docker/php
+    container_name: arena_reverb
+    working_dir: /var/www/html
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      - app
+      - redis
     networks:
       - arena_net
 

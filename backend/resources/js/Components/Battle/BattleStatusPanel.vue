@@ -22,28 +22,44 @@ const barClass = computed(() =>
         rose: 'bg-rose-400',
     }[props.color] ?? 'bg-emerald-400'),
 );
+
+const textClass = computed(() =>
+    ({
+        emerald: 'text-emerald-300',
+        rose: 'text-rose-300',
+    }[props.color] ?? 'text-emerald-300'),
+);
 </script>
 
 <template>
-    <div class="bg-gray-800 rounded-xl p-4 space-y-2">
+    <div class="bg-gray-800/80 rounded-xl p-4 space-y-2 border border-gray-700/50">
         <div class="flex items-baseline justify-between">
             <div class="text-sm text-gray-400">{{ label }}</div>
-            <div class="font-semibold">
+            <div class="font-semibold" :class="textClass">
                 {{ name }}<span v-if="level !== null" class="text-xs text-gray-400 ms-1">Lv.{{ level }}</span>
             </div>
         </div>
-        <div class="text-sm">HP: {{ hp }} / {{ maxHp }}</div>
-        <div class="h-2 rounded bg-gray-700 overflow-hidden">
+        <div class="flex items-baseline justify-between text-sm">
+            <span>HP</span>
+            <span class="font-semibold">{{ hp }} / {{ maxHp }}</span>
+        </div>
+        <div class="h-2.5 rounded-full bg-gray-700 overflow-hidden ring-1 ring-gray-600/30">
             <div
-                class="h-full transition-all"
+                class="h-full transition-all duration-500"
                 :class="barClass"
                 :style="{ width: `${percent}%` }"
             />
         </div>
-        <div v-if="stats" class="text-[10px] text-gray-500 space-y-0.5 pt-1 border-t border-gray-700/50">
-            <div>ATK {{ stats.atk }} / DEF {{ stats.def }}</div>
-            <div v-if="stats.str !== undefined">
-                力{{ stats.str }} 体{{ stats.vit }} 器{{ stats.dex }} 魔{{ stats.int_stat }}
+        <div v-if="stats" class="text-[10px] text-gray-500 space-y-0.5 pt-1 border-t border-gray-700/50 mt-2">
+            <div class="flex justify-between">
+                <span>ATK {{ stats.atk }}</span>
+                <span>DEF {{ stats.def }}</span>
+            </div>
+            <div v-if="stats.str !== undefined" class="flex justify-between text-gray-600">
+                <span>力{{ stats.str }}</span>
+                <span>体{{ stats.vit }}</span>
+                <span>器{{ stats.dex }}</span>
+                <span>魔{{ stats.int_stat }}</span>
             </div>
         </div>
     </div>

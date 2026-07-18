@@ -8,6 +8,7 @@ use App\Exceptions\Arena\InsufficientGoldException;
 use App\Models\Battle;
 use App\Models\Character;
 use App\Models\House;
+use App\Models\PartyMember;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -95,15 +96,19 @@ class HiringService
      */
     public function release(House $house, Character $character): Character
     {
-        if ((int) $character->house_id !== (int) $house->id) {
-            throw CharacterNotHireableException::notOwnedByHouse();
-        }
+        return DB::transaction(function () use ($house, $character): Character {
+            $character->refresh()->lockForUpdate();
+            if ((int) $character->house_id !== (int) $house->id) {
+                throw CharacterNotHireableException::notOwnedByHouse();
+            }
 
-        $character->house_id = null;
-        $character->hired_at = null;
-        $character->save();
+            PartyMember::query()->where('character_id', $character->id)->delete();
+            $character->house_id = null;
+            $character->hired_at = null;
+            $character->save();
 
-        return $character;
+            return $character;
+        });
     }
 
     /**

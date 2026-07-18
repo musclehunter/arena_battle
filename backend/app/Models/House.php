@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class House extends Model
 {
@@ -40,6 +41,11 @@ class House extends Model
     public function battles(): HasMany
     {
         return $this->hasMany(Battle::class);
+    }
+
+    public function party(): HasOne
+    {
+        return $this->hasOne(Party::class);
     }
 
     /**

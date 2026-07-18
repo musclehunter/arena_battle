@@ -41,6 +41,10 @@ final class BattleViewModel
                 'level' => $character?->level,
                 'exp' => $character?->exp,
                 'next_exp' => $character ? LevelUpService::requiredExpToNext($character) : null,
+                'preset_key' => $preset?->key,
+                'icon_key' => $preset?->icon_key,
+                'icon_index' => $character?->icon_index,
+                'gender' => $character?->gender ? strtolower($character->gender->name) : 'unknown',
                 'stats' => $character ? [
                     'str' => $character->str,
                     'vit' => $character->vit,
@@ -55,6 +59,10 @@ final class BattleViewModel
                 'hp' => $battle->enemy_hp,
                 'max_hp' => $enemyDerived['hp'],
                 'level' => $enemyPreset?->base_level,
+                'preset_key' => $enemyPreset?->key,
+                'icon_key' => $enemyPreset?->icon_key,
+                'icon_index' => 0,
+                'gender' => 'unknown',
                 'stats' => $enemyPreset ? [
                     'atk' => $enemyDerived['atk'],
                     'def' => $enemyDerived['def'],

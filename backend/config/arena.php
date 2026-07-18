@@ -24,7 +24,12 @@ return [
     */
 
     'house_level_slots' => [
-        1 => 3,
+        1 => 5,
+    ],
+
+    'party' => [
+        'size' => 5,
+        'reward_gold' => 600,
     ],
 
     /*
