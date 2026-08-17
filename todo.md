@@ -1,405 +1,486 @@
-# 1v1アリーナ v1 実装Todo
+# Arena v1 実装Todo（スコープ文書準拠版）
 
-`arena_v1_architecture_ja.md` をもとに、実装作業を粒度を揃えた粗い順で並べたチェックリストです。
-各ステップが完了したら `[ ]` を `[x]` に置き換えて進捗を管理します。
+ルートのスコープ文書群を唯一の仕様源とし、実装作業をフェーズ別に並べたチェックリストです。
+各項目が完了したら `[ ]` を `[x]` に置き換えて進捗を管理します。
 
----
+## 参照するスコープ文書
 
-## ステップ0: 環境構築
+| 層 | 文書 | 役割 |
+|---|---|---|
+| 第1層 ビジョン | `arena_vision_ja.md` | 最終的に目指す世界像 |
+| 第2層 コアループ | `arena_v1_core_loop_ja.md` | 1プレイセッションの流れ |
+| 第3層 戦闘 | `arena_v1_combat_scope_ja.md` | ステ/属性/スキル/AI/ヘイト/撤退/アリーナ/ダンジョン |
+| 第3層 経済 | `arena_v1_economy_scope_ja.md` | ワールドバンク/報酬/シンク/生産/取引 |
+| 第3層 生きた世界 | `arena_v1_living_world_scope_ja.md` | NPC家門/種族/外交/血盟/PvPvE |
+| 第3層 シーズン | `arena_v1_season_scope_ja.md` | 14日シーズン/ワイプ/痕跡/創発アンロック/秘宝 |
+| 第3層 UI | `arena_v1_ui_scope_ja.md` | 画面設計と実装優先順 |
 
-- [x] Docker Compose 一式を用意する (app / web / vite / db / redis)
-- [x] Laravel プロジェクトを `backend/` に新規作成する
-- [x] Inertia.js + Vue 3 を導入する (Breeze Vue スタック)
-- [x] Tailwind CSS を導入し、ビルド確認する (`npm run build` 成功)
-- [x] MySQL 接続設定を `.env` に記述し、接続確認する (migrate 成功)
-- [x] Redis を導入し、キャッシュ・セッションドライバとして設定する
-- [x] `docker compose up -d` で `http://localhost` に 200 応答することを確認
+> `arena_v1_1_scope_ja.md` / `arena_v1_2_scope_ja.md` / `arena_v1_mvp_ja.md` / `arena_v1_architecture_ja.md` は
+> プロトタイプ期（v1.0〜v1.2.1）の仕様であり、**上記スコープ文書と食い違う場合はスコープ文書を優先**する。
 
----
+## 進め方の原則
 
-## ステップ1: DBとモデル
-
-### マイグレーション
-
-- [ ] `users` に必要なら `name` / `current_rating` を追加する (v1 では保留)
-- [x] `character_presets` マイグレーション作成
-- [x] `battles` マイグレーション作成
-- [x] `battle_logs` マイグレーション作成
-
-### モデル
-
-- [x] `CharacterPreset` モデル作成
-- [x] `Battle` モデル作成 + リレーション(`user` / `playerPreset` / `enemyPreset` / `logs`)
-- [x] `BattleLog` モデル作成 + `battle` リレーション
-
-### シーダー
-
-- [x] `CharacterPresetSeeder` 作成 (`player_basic` / `enemy_basic`)
-- [x] `DatabaseSeeder` に登録し、`php artisan migrate:fresh --seed` が通ることを確認
+1. 現行 `backend/` はスコープが描く姿の**「種（プロトタイプ）」**として扱う。採用/改造/削除を都度判断する。
+2. 各フェーズ着手前に、末尾「要協議の未確定仕様」のうち該当項目を埋める。
+3. 数値（係数・コスト・確率）はすべて `config/` に外出しし、バランス調整をコード変更なしで回せるようにする。
 
 ---
 
-## ステップ2: Enum とドメイン型
+## 0. 現行実装の棚卸し（種の一覧）
 
-- [x] `App\Enums\BattleActionType` を作成 (`weak` / `strong` / `counter`)
-- [x] `App\Enums\BattleStatus` を作成 (`in_progress` / `finished`)
-- [x] `App\Enums\BattleWinner` を作成 (`player` / `enemy` / `draw`)
-- [x] `Battle` / `BattleLog` モデルで Enum を cast する
+| 現行資産 | スコープ上の位置づけ | 扱い |
+|---|---|---|
+| `Services/Battle/AtbBattleState` | ATBティック制戦闘（戦闘 §2.1） | 拡張（ティック0.1秒・ゲージ消費の本実装へ） |
+| `Services/Battle/DamageCalculator` | ダメージ式（戦闘 §3.3） | 改造（3すくみ廃止 → 属性別攻防の合算式へ） |
+| `Services/Battle/EnemyActionDecider` | 敵AI（戦闘 §6） | 拡張（味方AIと共通ロジック化・行動方針/ヘイト参照） |
+| `Services/Battle/BattleLogFactory` | 戦闘ログ（UI §3.6） | 拡張（属性/クリティカル/スキル名の表記） |
+| `Services/Character/CharacterStats` | 派生ステ（戦闘 §2.4） | 改造（4ステ → 6基本ステ + 派生12種） |
+| `Services/Character/LevelUpService` / `GrowthRank` | 成長（ビジョン §9 素体育成ルート） | 拡張（EXPゴムバンド係数を被せる） |
+| `Services/Character/SkillService` + `skills`/`character_skills` | スキル（戦闘 §4・§5） | 拡張（5系統×4スキル・属性タグ・ATB消費/CTへ） |
+| `Services/Arena/HiringService` / `JobSeekerBoard` / `GuestContext` | 雇用市場（コアループ §5.1、経済 §6） | 拡張（雇用コスト式・契約/給与・忠誠度へ） |
+| `Services/Arena/RewardDistributor` | 戦闘報酬（経済 §5） | 改造（報酬式 + リスク倍率 + ゴムバンド） |
+| `Services/ProductionService` + `config/production.php` | 生産（経済 §4.5） | 拡張（素材採取3/装備生産2/薬調合 + 成功確率・時間） |
+| `Models/Party` / `PartyMember` / `PartyBattle` | パーティ5人・戦闘単位（コアループ §3.3.3） | 拡張（家門横断編成・PTリーダー） |
+| `Models/House` / `Character` / `GrowthPreset` | 家門と流動する人材（ビジョン §4） | 継続利用 |
+| `Models/Item` / `HouseInventory` / `ProductionJob` | アイテム経済（経済 §4） | 拡張（装備の属性値/劣化/強化） |
+| `Models/Battle` + 3すくみ 1v1（`BattleController`） | v1.0 プロトタイプ | 廃止候補（パーティ戦へ一本化。移行完了後に削除） |
+| `Pages/Market` / `Pages/BloodPact` / `Pages/Settings` | 市場・血盟・設定（UI §3.8/§3.10） | ダミー画面を本実装に置換 |
+| `Pages/Battle` / `Pages/PartyBattle` / `Pages/House` / `Pages/JobSeekers` / `Pages/Character` / `Pages/Skills` / `Pages/Production` | UI Phase1 の骨格 | 拡張 |
 
----
-
-## ステップ3: ダメージ計算(ロジックコア)
-
-- [x] `App\Services\Battle\DamageCalculator` を作成(結果 DTO: `TurnResolution` / `TurnOutcome`)
-- [x] 9.4 の全組み合わせを網羅する PHPUnit テストを書く
-  - [x] 弱 vs 弱
-  - [x] 弱 vs 強
-  - [x] 弱 vs カウンター
-  - [x] 強 vs 弱
-  - [x] 強 vs 強
-  - [x] 強 vs カウンター
-  - [x] カウンター vs 弱
-  - [x] カウンター vs 強
-  - [x] カウンター vs カウンター
-- [x] 左右対称性テストを追加
-- [x] テスト緑化(10 passed / 72 assertions)
-
----
-
-## ステップ4: 静的画面(見た目の器)
-
-- [x] `resources/js/Pages/Battle/Show.vue` 作成(コンポーネント集約)
-- [x] `Components/Battle/BattleStatusPanel.vue` 作成(HPバー + 色切替)
-- [x] `Components/Battle/BattleLogPanel.vue` 作成(新ログで自動スクロール)
-- [x] `Components/Battle/BattleActionButtons.vue` 作成(弱/強/カウンター)
-- [x] `Components/Battle/BattleResultPanel.vue` 作成(勝敗テキスト色分け + 再戦ボタン)
-- [x] Show.vue をコンポーネントで再構成し `npm run build` 成功
+- [ ] 上記の「廃止候補」の削除タイミングを決める（パーティ戦へ完全移行した時点）
+- [ ] スコープ文書と現行 `config/arena.php` の係数名を突き合わせ、命名を新仕様に寄せる
 
 ---
 
-## ステップ5: バトル開始
+## Phase A 戦闘コア基盤
 
-- [x] `App\Actions\Battle\StartBattleAction` 作成
-  - プレイヤー/敵 preset 決定 → `battles` 作成 → 初期ログ作成
-- [x] `BattleController@index` (トップ/開始ボタン)
-- [x] `BattleController@store` → `StartBattleAction` 呼び出し
-- [x] `BattleController@show` → Inertia で `Battle/Show` に現在状態を渡す
-- [x] ルーティング登録 (`/`, `POST /battles`, `GET /battles/{battle}`)
-- [x] `/battles/{id}` が実データで表示されることを確認(Inertia props で HP/ログ到達)
-- [x] 最小の `Pages/Battle/Index.vue` / `Pages/Battle/Show.vue` を用意(コンポーネント分割はステップ4で実施)
+> 参照: `arena_v1_combat_scope_ja.md` §2〜§3・§6〜§9、`arena_v1_core_loop_ja.md` §3
 
----
+### A-1. 6基本ステータスへの移行
 
-## ステップ6: 1ターン解決
+- [ ] 基本ステを **STR / AGI / VIT / INT / FOC / SPI** の6種に移行する（既存: `characters.str/vit/dex/int_stat` を拡張・改名）
+- [ ] `character_presets` の `base_*` を6ステに拡張する
+- [ ] 成長プリセット `growth_presets.increments` を6ステ分の増分に拡張する（既存: `GrowthPreset` を拡張）
+- [ ] `CharacterStats` を派生ステ算出に拡張する（既存: `Services/Character/CharacterStats` を拡張）
+  - [ ] HP = VIT×10 + STR×2 + 基本値
+  - [ ] MP = SPI×8 + INT×2 + 基本値
+  - [ ] 物理攻撃 = STR×2 + AGI×1 / 魔法攻撃 = INT×2 + SPI×1
+  - [ ] 物理防御 = VIT×1.5 + STR×0.5 + 防具 / 魔法防御 = SPI×1.5 + INT×0.5 + 防具
+  - [ ] 攻撃速度（AGI）/ 命中 / 回避 / クリティカル率 / 状態異常成功率 / 状態異常抵抗 / 回復効率
+- [ ] 係数一式を `config/arena.php` の `derived_stats` に集約する（既存: 同セクションを拡張）
+- [ ] 派生ステのユニットテスト（境界値含む）を追加する
 
-- [x] `App\Services\Battle\EnemyActionDecider` 作成(プレイヤー前行動を見る簡易ヒューリスティック)
-- [x] `App\Services\Battle\BattleLogFactory` 作成(宣言 → 結果 → 決着 → 現在 HP の順)
-- [x] `App\Actions\Battle\ResolveTurnAction` 作成(行ロック・ログ保存・HP/ターン/status 更新・token 再発行)
-- [x] `App\Http\Requests\Battle\SubmitBattleActionRequest` 作成(`action` / `token` バリデーション)
-- [x] `status === in_progress` の検証(コントローラ内)
-- [x] token 検証(`hash_equals` で定数時間比較)
-- [x] `battles` テーブルに `action_token` カラム追加
-- [x] `BattleController@resolveTurn` 実装
-- [x] ルーティング登録 (`POST /battles/{battle}/turn`)
-- [x] 画面アクションボタン接続 + 結末表示 + 再戦ボタン
-- [x] Feature テスト 5 件緑化(正常/敗北/不正 token/終了済み)
+### A-2. 属性システム（物理3 + 元素4）
 
----
+- [ ] 属性 Enum を追加する（斬/打/突、炎/風/土/水）
+- [ ] 武器に属性別攻撃力、防具に属性別防御力を持たせる（既存: `items` を拡張。Phase B の装備と連動）
+- [ ] キャラの属性別攻撃/防御の集計処理を実装する（素体 + 装備 + バフ）
+- [ ] ダメージ合算式を実装する（既存: `DamageCalculator` を属性別に改造）
+  - [ ] 属性ごとに `攻撃力 - 防御力` を計算し合算
+  - [ ] 最小ダメージ1のクリップ
+  - [ ] クリティカル補正 × スキル補正 × 変動幅（±5%程度）
+  - [ ] 物理属性と元素属性のクロス相性は持たせない（v1）
+- [ ] 元素相性（炎>風>土>水>炎）を敵の防御値傾向として表現する
+- [ ] 3すくみ（弱/強/カウンター）ロジックを廃止する（`BattleActionType` の扱いを整理）
+- [ ] 属性別ダメージ計算のユニットテスト（スコープ §3.3 の計算例を固定化）
 
-## ステップ7: 勝敗判定
+### A-3. ATBティック制の本実装
 
-- [x] HP 0 以下で `status = finished` に更新
-- [x] `winner` を `player` / `enemy` / `draw` で確定
-- [x] `ended_at` を保存
-- [x] 決着後は行動ボタンを非表示 → 結末パネル + 再戦ボタン表示
-- [x] `BattleResultPanel` コンポーネントに分離(ステップ4で実施済み)
+- [ ] 0.1秒ティックのループを実装する（既存: `AtbBattleState` を拡張）
+- [ ] ゲージ蓄積速度を AGI ベースの速度係数から算出する
+- [ ] 行動ごとのゲージ消費（通常攻撃 / スキル別 `cast_gauge` / `cooldown_gauge`）を反映する（既存: `skills` テーブルの値を利用）
+- [ ] 1エンカウンター3〜8分に収まるようティック係数を調整する
+- [ ] 倍速（x1/x2/x4）と一時停止に対応するサーバ側設計を決める
+- [ ] 戦闘状態の永続化と復帰（オフライン中も進行するための設計）を実装する
 
----
+### A-4. 行動方針6種
 
-## ステップ8: 再戦
+- [ ] 行動方針 Enum を追加する（攻撃的 / 防御的 / 待機的 / 撤退 / スキル優先 / 回復優先）
+- [ ] パーティ単位の方針設定を実装する（既存: `parties.strategy` を拡張）
+- [ ] キャラ個別の上書き設定を実装する
+- [ ] 方針切り替えの2〜4秒ディレイを実装する
+- [ ] 方針ごとの行動選択ロジックを実装する（既存: `EnemyActionDecider` を味方AIと共通化して拡張）
+  - [ ] タンクAI（ヘイト獲得 / 庇う）
+  - [ ] DD AI（最大ダメージ対象の選択 / 低HP時の後退）
+  - [ ] サポートAI（HP50%以下で回復優先 / バフのタイミング）
 
-- [x] `App\Actions\Battle\RestartBattleAction` 作成(既存 battle の preset を元に新規 battle 生成)
-- [x] `StartBattleAction` を preset ID 指定可能に拡張(再戦と新規で共通化)
-- [x] `BattleController@restart` 実装
-- [x] ルーティング登録 (`POST /battles/{battle}/restart`)
-- [x] Show.vue の再戦ボタンを `battles.restart` に切替
-- [x] Feature テスト 3 件緑化(同 preset で新規生成 / 元 battle 不変 / リダイレクト)
+### A-5. 擬似確率判定
 
----
+- [ ] キャラ×効果ごとの内部カウンター方式で「N回中M回」判定を実装する
+- [ ] 対象判定を実装する（クリティカル / 命中 / 回避 / 状態異常 / 抵抗 / 撤退 / ロスト）
+- [ ] 敵味方でカウンターが独立することをテストで担保する
+- [ ] 連続失敗が発生しないことを統計テストで確認する
 
-## ステップ9: 仕上げ・検証
+### A-6. ヘイトシステム
 
-- [x] 10章のログ文言の順序を調整(非ダメージ系 → ダメージ系)
-- [x] `BattleLogFactoryTest` で設計書10章の 3 例を固定化
-- [x] 決着後の送信は `status` エラー、不正トークンは `token` エラーで弾かれることを `BattleTurnResolutionTest` でカバー
-- [x] `DamageCalculator` テスト 10 件全パス
-- [x] README に遊び方・テスト・アーキテクチャ概要・action_token 仕様を記載
-- [x] 全 46 テスト / 173 アサーション 緑
+- [ ] キャラごとのヘイト値を戦闘状態に保持する
+- [ ] ヘイト増減ルールを実装する（与ダメージ / 回復・バフ / 挑発 / 防御・待機で徐減 / 行動不能で減少）
+- [ ] 敵のターゲット選択をヘイト最大値ベースに変更する
+- [ ] 挑発・庇うなどのヘイト操作スキルと連動させる
 
----
+### A-7. 撤退システム
 
-## v1 スコープ外(やらない)
+- [ ] 撤退成功率を算出する（基本60% + HP残量0〜25% − レベル差0〜25% − 経過時間最大20%）
+- [ ] 戦闘中いつでも撤退を選択できるようにする
+- [ ] 撤退成功時の進捗按分報酬を実装する（討伐割合 / 到達深度 / 生存時間）
+- [ ] 撤退失敗時は戦闘継続とし、高リスクなら全滅時のロスト判定へ繋げる
 
-- アニメーション / 音 / 装備 / 複数敵 / 属性 / クリティカル / 回避 / 通信対戦 / ガチャ / ランキング / マップ移動
+### A-8. 勝敗・ロスト・負傷
 
----
-
-# v1.1: 家門 & 雇用モデル
-
-スコープは `arena_v1_1_scope_ja.md` に確定済み。
-
-## ステップ10: 基盤整備
-
-- [x] `config/arena.php` を作成(雇用上限・初期gold・報酬・割增率・求職者パラメータ・`guest_house_id=1` / `system_user_id=1`)
-- [~] 既存テストは既に壊れている(battles スキーマ変更のため)。ステップ14-17 で修復予定
-
-## ステップ11: マイグレーション & モデル
-
-- [x] `houses` テーブル作成
-- [x] `characters` テーブル作成 (`house_id nullable FK → houses`)
-- [x] `battles` テーブル変更(既存 migration を直接編集)
-  - `house_id` / `guest_session_id` / `player_character_id` / `reward_gold_*` 追加
-  - `player_preset_id` 削除
-- [x] migration 順序調整(houses 181308 / characters 181310 を挑む)
-- [x] `migrate:fresh` が通ることを確認
-- [x] `House` / `Character` モデル(リレーション・状態判定メソッド・スコープ)
-- [x] `User ↔ House` の `hasOne`
-- [x] `Battle` モデルを v1.1 スキーマに更新(`playerCharacter` / `house` / `isGuestBattle`)
-
-## ステップ12: ドメインサービス
-
-- [x] `GuestContext` (セッションの gold / hired_character_id / job_seeker_ids を扱う)
-- [x] `JobSeekerBoard` (3名取得 / バトル完了時に破棄 / 候補絞り込みクエリ)
-- [x] `HiringService`
-  - [x] `hireByHouse(House, Character)`
-  - [x] `hireAsGuest(GuestContext, Character)` (`hire_cost × 1.5`)
-  - [x] `release(House, Character)` (gold 保持)
-  - [x] `autoReleaseAfterGuestBattle(Battle)`
-- [x] `RewardDistributor` (勝利時のみ、bp で分配、ゲスト/家門で振り分け先を切替)
-
-## ステップ13: Seeder
-
-- [x] `SystemAccountSeeder` 作成(ダミー user `system@arena.local` / id sanity check)
-- [x] `GuestHouseSeeder` 作成(ダミー user に紐づく "Guest House" / id sanity check)
-- [x] `CharacterPresetSeeder` を整備(プレイヤー用プリセットを複数種類)
-- [x] `JobSeekerSeeder` 作成(10名 / 固有名リスト / Lv1 / gold=50 / hire_cost と share_bp を算出)
-- [x] `DatabaseSeeder` に順序固定で登録 (System → GuestHouse → Preset → JobSeeker)
-
-## ステップ14: Actions 改修
-
-- [x] `CreateHouseAction` 追加(家門名入力 / 既存ゲスト gold は破棄 / house gold=1000 で作成)
-- [x] `HireCharacterAction` 追加(家門雇用 / 枠チェック / gold チェック)
-- [x] `GuestHireCharacterAction` 追加(ゲスト雇用 → バトル即開始の呼び出し元)
-- [x] `ReleaseCharacterAction` 追加(解雇 / キャラ gold は保持)
-- [x] `StartBattleAction` 改修
-  - `Character` を受け取り、preset ID ではなく `player_character_id` を保存
-  - 同時進行バトル1件の制約チェック(家門/ゲスト両対応)
-- [x] `ResolveTurnAction` 改修
-  - 決着時に `RewardDistributor` を呼ぶ
-  - ゲスト雇用バトルは `autoReleaseAfterGuestBattle` を呼ぶ
-  - 決着時に `JobSeekerBoard::invalidate()` を呼ぶ
-- [x] `RestartBattleAction` 改修
-  - 家門雇用中キャラなら同キャラで再戦 (house_id据え置き)
-  - ゲスト雇用は再戦不可 or 都度再雇用(→ ボタン出し分け)
-
-## ステップ15: Controller & Routing
-
-- [x] `HouseController` (create form / store / show = ダッシュボード)
-- [x] `JobSeekerController@index` (ゲスト・家門両対応)
-- [x] `CharacterController@release`
-- [x] `GuestHireController@store` (ゲスト雇用してバトル開始まで)
-- [x] `HireController@store` (家門雇用のみ)
-- [x] `BattleController` 改修
-  - 所有者認可(user or guest_session_id)
-  - レスポンスに報酬情報を含める
-- [x] `routes/web.php` にルート追加
-- [x] Policies: `BattlePolicy` / `HousePolicy` / `CharacterPolicy`
-
-## ステップ16: Vue / Inertia
-
-- [x] `Pages/Home.vue` 改修(ゲスト導線 / ログイン済みは家門へリダイレクト)
-- [x] `Pages/JobSeekers/Index.vue` 新規(3カード / 雇用ボタン2種)
-- [x] `Pages/House/Create.vue` 新規(家門名入力)
-- [x] `Pages/House/Mine.vue` 新規(雇用枠表示 / キャラ一覧 / 解雇ボタン)
-- [x] `Pages/Battle/Show.vue` 改修(キャラ名・家門情報・報酬表示)
-- [x] `Components/JobSeekerCard.vue`
-- [x] `Components/CharacterCard.vue`(家門ダッシュボード用)
-- [x] `Components/GoldBadge.vue`(gold表示の共通部品)
-
-## ステップ17: テスト
-
-- [x] `HiringService` のユニットテスト
-- [x] `RewardDistributor` のユニットテスト(分配計算 / ゲスト分岐)
-- [x] Feature: ゲスト雇用 → バトル → 完了で求職者に戻る
-- [x] Feature: 家門作成 → 継続雇用 → 勝利で報酬分配
-- [x] Feature: 家門雇用枠 3 超過 → 422
-- [x] Feature: gold 不足で雇用 → 422
-- [x] Feature: 同時進行バトル1件制限(家門・ゲスト)
-- [x] Feature: 雇用中キャラは求職者リストに出てこない
-- [x] Feature: バトル完了でリスト破棄 → 次回訪問で再抽選
-- [x] Feature: ゲスト gold 破棄 → 家門作成で 1000 から始まる
-- [x] Feature: 解雇するとキャラの gold が保持される
-
-## ステップ18: 仕上げ
-
-- [x] README に v1.1 遊び方・概念(家門/求職者/雇用)を追記
-- [x] 設計書 `arena_v1_architecture_ja.md` に v1.1 章を追加 or スコープMD と相互リンク
-- [x] 全テスト緑化確認
+- [ ] 勝敗判定を実装する（敵全滅 / 自軍全滅 / 目標達成 / 撤退成功）
+- [ ] 永久ロスト判定を実装する（高リスク全滅時のみ、キャラ別死亡確率）
+- [ ] 死亡確率の変動要因を反映する（レベル差 / 戦闘時間 / 深度 / 戦闘不能数 / 装備状態）
+- [ ] ロスト回避手段を実装する（撤退 / 命の護符 / 救援依頼 / 事前情報）
+- [ ] 負傷状態（通常リスク全滅時、一定時間出撃不可）と治療手段を実装する
 
 ---
 
-# v1.2: キャラクターステータス拡張 & レベリング
+## Phase B 職業・スキル・装備
 
-スコープは `arena_v1_2_scope_ja.md` に確定済み。
+> 参照: `arena_v1_combat_scope_ja.md` §4〜§5、`arena_v1_economy_scope_ja.md` §4.2〜§4.4、`arena_v1_core_loop_ja.md` §4
 
-## ステップ19: 設計・設定
+### B-1. 5系統の職業
 
-- [x] `config/arena.php` に `derived_stats` / `leveling` セクションを追加
-- [x] `arena_v1_2_scope_ja.md` を作成(基本ステ / 派生ステ / 成長プリセット / EXP 仕様)
+- [ ] 職業系統を **衛士 / 剣士 / 弓手 / 僧侶 / 術士** に再定義する（既存: `config/skills.php` の warrior/rogue/priest を改名・拡張し、衛士を新設）
+- [ ] 「職業はスキル系統への投資で決まる呼称」というモデルに切り替える（固定職を廃止）
+- [ ] 術士は創発アンロック後に解放する（Phase E と連動）
+- [ ] キャラ詳細に職業系統グラフを出せるよう系統投資量を保持する
 
-## ステップ20: マイグレーション & モデル
+### B-2. 各系統4スキル
 
-- [x] `growth_presets` テーブル追加(`key` UNIQUE / `increments` JSON 10要素 / `next_preset_key`)
-- [x] `character_presets` を v1.2 仕様に変更(`hp_max/atk/def` → `base_str/vit/dex/int` + `base_level` + `growth_preset_key`)
-- [x] `characters` に `exp` / `str/vit/dex/int_stat` / `growth_preset_key` / `growth_index` を追加
-- [x] `GrowthPreset` モデル (`incrementAt` / `nextKey`) を新設
-- [x] `Character` / `CharacterPreset` モデルに新カラムを反映
-- [x] `migrate:fresh --seed` が通ることを確認
+- [ ] スキルマスタを5系統×4スキルに整備する（既存: `skills` テーブル / `SkillSeeder` を拡張）
+  - [ ] 衛士: 挑発 / 鉄壁の構え / 庇う / 反撃の構え
+  - [ ] 剣士: 烈斬 / 気合 / 突進斬り / 旋風斬（既存スキルを流用）
+  - [ ] 弓手: 狙撃 / 乱射 / 毒矢 / 牽制射（既存スキルを流用）
+  - [ ] 僧侶: 治癒の祈り / 祝福 / 聖撃 / 浄化
+  - [ ] 術士: ファイアボール / アイスニードル / ウィンドカッター / ストーンアーマー
+- [ ] スキルタイプ7種を実装する（攻撃 / 防御 / 回復 / バフ / デバフ / 妨害 / 特殊）
+- [ ] スキルに属性タグ（複数可）を持たせ、ダメージ計算に接続する（既存: `skills.element` を複数属性対応に拡張）
+- [ ] スキルコストを実装する（ATBゲージ消費 / クールタイム / 一部 MP・SP・アイテム）
+- [ ] スキル習得をスキルポイント/熟練度で行う（既存: `characters.skill_points` / `character_skills` を拡張）
+- [ ] スキルセット（装備中スキル）の管理を実装する
 
-## ステップ21: ドメインサービス
+### B-3. 装備システム
 
-- [x] `App\Services\Character\CharacterStats` (`derive` / `forEntity` / `forPreset`)
-- [x] `App\Services\Character\LevelUpService`
-  - [x] `rewardExpFromEnemyLevel(int)`
-  - [x] `requiredExpToNext(Character)`
-  - [x] `grantExp(Character, int)`(Lvup ループ / `growth_index` 進行 / プリセット切替)
+- [ ] 装備テーブルを新設する（武器 / 防具 / 装飾品、属性別攻防値を保持）
+- [ ] キャラの装備スロットと装備変更を実装する
+- [ ] 装備の劣化を実装する（戦闘ごとに劣化、性能低下、修理コスト）
+- [ ] 装備強化を実装する（安全 / 通常 / 高リスクの3モード、擬似確率で成功判定）
+- [ ] 強化コスト表を `config` に定義する（+1/+3/+5/+7 の3モード別コスト）
+- [ ] レア装備の経年崩壊（時間経過 or 使用回数）と素材分解を実装する
+- [ ] 高リスク全滅時の装備破損/ロストを実装する
 
-## ステップ22: Seeder
+### B-4. リスクレベル
 
-- [x] `GrowthPresetSeeder` 追加(warrior → rogue → mage → priest → warrior のサイクル + `enemy_growth`)
-- [x] `DatabaseSeeder` に `GrowthPresetSeeder` を `CharacterPresetSeeder` より前に登録
-- [x] `CharacterPresetSeeder` を新スキーマで書き直し(プレイヤー素体 4 種 + 敵 3 種)
-- [x] `JobSeekerSeeder` で Character に基本ステ / 成長プリセット / EXP=0 / growth_index=0 を付与
-
-## ステップ23: Actions / Controller / ViewModel 改修
-
-- [x] `StartBattleAction` を `CharacterStats::forEntity/forPreset` で HP 派生計算に変更
-- [x] `ResolveTurnAction` 勝利時に `LevelUpService::grantExp` を呼び EXP 付与
-- [x] `HouseController` / `JobSeekerController` で Lv / EXP / 基本ステ / 派生ステを props に含める
-- [x] `BattleViewModel` で player/enemy の Lv / EXP / 基本ステ / 派生ステを返す
-
-## ステップ24: Vue / Inertia
-
-- [x] `Pages/JobSeekers/Index.vue` でカードに Lv / EXP / 力体器魔 / ATK / DEF を表示
-- [x] `Pages/House/Mine.vue` のキャラ一覧に同情報を表示
-- [x] `Components/Battle/BattleStatusPanel.vue` に `level` / `stats` props を追加
-- [x] `Pages/Battle/Show.vue` で `BattleStatusPanel` に Lv / stats を渡す
-
-## ステップ25: 認証画面の UI 統一
-
-- [x] `GuestLayout` をゲームと同じダークトーンに再デザイン
-- [x] `Auth/Login` / `Register` / `ForgotPassword` / `ResetPassword` / `ConfirmPassword` / `VerifyEmail` を統一スタイルに更新
-
-## ステップ26: テスト
-
-- [x] Unit: `CharacterStatsTest`(派生計算の基本 + 境界)
-- [x] Feature: `LevelUpServiceTest`(必要 EXP / Lvup / プリセット切替 / 獲得 EXP 計算)
-- [x] 既存 Battle / Hire / Reward 系テストを新 API に追従
-- [x] 全テスト緑化確認 (78 passed / 265 assertions)
-
-## ステップ27: ドキュメント
-
-- [x] `arena_v1_2_scope_ja.md` を整備
-- [x] `todo.md` に v1.2 セクション追加・v1.1 の済み項目を反映
-- [x] README に v1.2 の遊び方(Lv / EXP / 成長プリセットサイクル / 壁ステ)を追記
+- [ ] 出撃前のリスク選択を実装する（安全 / 通常 / 高リスク）（既存: `parties.risk` / `party_battles.risk` を拡張）
+- [ ] リスク別の報酬倍率・ロスト有無を反映する（安全 x0.5〜0.7 / 通常 x1.0 / 高リスク x1.5〜2.0）
+- [ ] 出撃前に死亡確率・撤退成功率・想定報酬を可視化する
 
 ---
 
-# v1.2.1: 成長プリセットのランク体系化
+## Phase C 経済基盤
 
-固定サイクル(職替え)を廃し、各職に 5 段階ランク(easy〜master)を用意。
-同職内でランク抽選により成長プリセットが切り替わる仕組みを導入。
+> 参照: `arena_v1_economy_scope_ja.md` 全体、`arena_vision_ja.md` §7〜§8
 
-## ステップ28: スキーマ / モデル
+### C-1. 戦闘報酬
 
-- [x] `growth_presets` に `job` / `rank` / `rank_order` を追加、`next_preset_key` を廃止
-- [x] `characters` に `growth_rank_box` (JSON) を追加
-- [x] `GrowthPreset` モデルを新カラム対応に更新
-- [x] `Character` モデルに `growth_rank_box` を fillable/cast 追加
+- [ ] 報酬式を実装する（既存: `Services/Arena/RewardDistributor` を拡張）
+  - [ ] 基本報酬 = 敵戦力スコア × リスク倍率 × 討伐数/目標達成度
+  - [ ] 最終報酬 = 基本報酬 × 生存ボーナス × 痕跡倍率
+- [ ] 敵戦力スコアの算出（ステータス + 装備）を実装する
+- [ ] 数値基準に合わせて調整する（通常1戦: 報酬100G / 修理70G / 純利益30G）
+- [ ] 撤退時の進捗按分報酬を実装する（Phase A-7 と連動）
 
-## ステップ29: ランク定義 & 抽選ロジック
+### C-2. ワールドバンク（総量管理）
 
-- [x] `App\Services\Character\GrowthRank` 新設(RANKS / lower / next / key 組立 / initialBox)
-- [x] `LevelUpService::advanceRank` を実装(抽選・維持・アップ・ダウン・境界処理)
-- [x] `LevelUpService::grantExp` から `advanceRank` を呼ぶよう書換
+- [ ] Gold・主要アイテムの世界総保有量を集計する仕組みを作る
+- [ ] 目標保有量を算出する（プレイヤー数 × 目標保有量 + NPC家門保有 + 世界運営保有）
+- [ ] 調整レバーを実装する（Goldドロップ / 装備ドロップ / 素材採取率 / 消費アイテムドロップ / 強化失敗率 / NPC商店買取価格）
+- [ ] 数分ごとの監視バッチと移動平均による緩やかな補正を実装する
+- [ ] 狩場混雑によるドロップ価値低下を実装する
 
-## ステップ30: 設定
+### C-3. シンクとフォーセット
 
-- [x] `config/arena.php` に `rank_box` セクション追加(initial_current/next, add_lower/next_on_rankup)
+- [ ] フォーセットを整理する（戦闘報酬 / クエスト報酬 / 素材販売 / 交易 / 遺産ボーナス）
+- [ ] シンクを実装する（装備修理 / 強化 / 雇用 / 契約更新・給与 / 訓練 / 血盟・拠点維持費 / アリーナ参戦費 / 交易税）
+- [ ] 各シンクのコストを `config` に集約する
 
-## ステップ31: シーダー
+### C-4. ゴムバンド（キャッチアップ）
 
-- [x] `GrowthPresetSeeder` を 4職+enemy × 5ランク の 25 プリセット自動生成に変更
-- [x] `CharacterPresetSeeder` の `growth_preset_key` を `{job}_normal` 形式に更新(敵は easy/hard)
-- [x] `JobSeekerSeeder` で Character 生成時に `growth_rank_box` を初期化
+- [ ] 世界平均Lv・Lv分布・最大Lvを集計する
+- [ ] EXP倍率のキャッチアップ係数を実装する（最大 x2.0 / 最低 x0.5）（既存: `LevelUpService` に倍率レイヤーを追加）
+- [ ] Gold報酬側のゴムバンドを実装する（上位層の優位は残す）
 
-## ステップ32: テスト
+### C-5. 雇用市場の経済
 
-- [x] `CreatesArenaFixtures::createJobSeeker` で `growth_rank_box` を初期化
-- [x] `LevelUpServiceTest` を新 API で書き直し(維持/アップ/ダウン/easy境界/masterループ/抽選)
-- [x] 全テスト緑化確認 (85 passed / 279 assertions)
+- [ ] 雇用コスト式を実装する（基本 + レベル + ステータス + スキル + レア素質 + 市場需給）（既存: `HiringService` / `characters.hire_cost` を拡張）
+- [ ] 契約期間と給与、契約更新/解雇を実装する
+- [ ] 待遇に応じた忠誠度と逃亡判定を実装する
+- [ ] ゲスト雇用（短期・報酬分割・血盟内割引）を再設計する（既存: `GuestContext` / ゲスト雇用フローを拡張）
+- [ ] 家門Lvによる雇用上限を実装する（Lv1で5人 → Lv10で20人程度）
 
-## ステップ33: ドキュメント
+### C-6. 生産
 
-- [x] `arena_v1_2_scope_ja.md` をランク抽選仕様に更新
-- [x] README の成長プリセットセクションを v1.2.1 仕様に更新
-- [x] `todo.md` に v1.2.1 セクション追加
+- [ ] 生産スキルを6種に整備する（採掘 / 伐採 / 皮革採取 / 武器鍛造 / 防具鍛造 / 薬調合）（既存: `ProductionService` + `config/production.php` を拡張）
+- [ ] 生産スキルをキャラ単位の習得・熟練度制にする
+- [ ] 素材 + Gold + 時間のコストモデルを実装する（現行の固定5秒を実時間設計に置換）
+- [ ] 成功確率を擬似確率方式にする
+- [ ] 生産中キャラは出撃不可の制約を実装する（既存の in_progress 判定を拡張）
 
-## 今後の開発予定
+### C-7. 取引3形式
 
-- [] プロフィールの画面のデザインがLaravelデフォルトのままなので統一されたデザインに修正する
-- [] ゲストでプロフィール表示したときにデリートアカウントできそう→ゲストのプロフィール表示を無しにする
-- [] ログアウトができない
-- [] ゲームのタイトルロゴとバージョンを画面に表示しましょう。コピーライトを下部に表示する
-- [] 敵もキャラクター化して、成長できるようにする
-- [] アリーナの敵には求職中のキャラクターも出場してくる
-- [] アリーナランクを作る
-- [] ダンジョンを追加する。
-- [] 装備を追加する
-- [] 求職中とか文言がださいのを直す。
-- [] 多言語対応は後で
-- [] 成長ランクをキャラクター詳細に表示する。
-- [] キャラクターの成長ランクの変更ロジックを調整する。
-- [] キャラクターの初期ステータスにバリエーションを増やす
-- [] クリティカル率、クリティカルダメージ倍率、クリティカル耐性、クリティカルダメージ耐性を追加する
-- [] コマンドスキルを追加する。すべての行動スキルとする。弱攻撃→基本攻撃、ジョブごとのスキル
-- [] キャラクターの成長に応じてスキルを解放する
-- [] ログインボーナス
-- [] 初心者成長クエスト的なやつ、達成したら報酬を得る。
-- [] キャラクターの成長に応じて装備を解放する。装備の種類を解放していく
-- [] 属性システムの詳細を検討し、追加する。
-- [] スキル用パラメータの追加、力→魔力、体力→精神力、器→集中力、スキルクリティカル率、スキルクリティカルダメージ倍率、スキルでも物理か魔法（属性）攻撃かで防御なのか、魔法防御なのかかわる
-- [] アイコンや背景画像などを使ってもう少し装飾する。アニメーションをいれる。戦闘やレベルアップ、報酬獲得時など各種演出を入れる。
-- [] サウンドをいれる
-- [] 取引所の作成（売買登録、オークション登録）
-- [] 生産システムの追加（アイテムの生産）
-- [] クエストシステムの追加
-- [] ゲームの基本画面の改修、アドベンチャーゲーム風にする。背景＋キャラクターみたいな。
-- [] キャラクターのアイコン画像を表示する（/images/characters/icons に配置する）
-- [] メンテナンスモードを実装する。完全にプレイ不能と運営用キャラだけプレイ可能なモード
+- [ ] 市場板（中央取引所）を実装する（出品 / 購入 / 手数料5〜10% / 取引履歴）→ `Pages/Market` のダミー画面を置換
+- [ ] NPC商店を実装する（ワールドバンク連動の買取・販売価格）
+- [ ] 直接取引（同期・相互確認）を実装する
+- [ ] 郵便（宅配）を実装する（非同期・時間差到着）
+- [ ] NPC家門を市場板に参加させる（Phase D と連動）
 
+---
 
-## ダンジョンについて
+## Phase D 生きた世界
 
-- 仮想マップを内部的に作成する
-- 選択肢を選ぶことで移動する（左の道へ進む、奥へ進む、右の道へ進む、引き返す、帰還するなど
-- マップの座標にイベントを登録しておく
-- 移動時などにイベントが発動する
-- イベントは、モンスターとの戦闘、宝箱の出現、NPCとの会話、罠の発動、特殊な場所への移動など
-- 戦闘では敵はひとりとは限らない
-- 敵はモンスターとは限らない、他のキャラクターの可能性もある（座標が衝突した場合）
-- 必ずしも戦闘する必要はない（逃げたり、会話したりする）
+> 参照: `arena_v1_living_world_scope_ja.md` 全体、`arena_v1_combat_scope_ja.md` §10〜§11
 
+### D-1. NPC家門
 
+- [ ] NPC家門をプレイヤー家門と同一モデルで表現する（既存: `House` に NPC フラグと生成パラメータを追加）
+- [ ] 生成パラメータを実装する（種族 / 家門Lv / 目的 / 性格 / 初期資産）
+- [ ] 目標総家門数 = clamp(プレイヤー家門数 × 3, 50, 200) に基づく動的生成を実装する
+- [ ] 数分ごとの生成バッチ（ゆるやかな補填）を実装する
+- [ ] 消滅トリガーを実装する（目的達成後の休眠 / 経済破綻 / 目標数減少）と資産の還元処理
+- [ ] NPC家門の活動を実装する（クエスト受注 / ダンジョン遠征 / アリーナ参加 / 交易 / 雇用・解雇 / 血盟活動）
+- [ ] NPC家門の目標決定AI（種族傾向 + 性格補正、1日1回の見直し）を実装する
+- [ ] 求職者プールにNPC家門も参加させる（既存: `JobSeekerBoard` を拡張）
 
+### D-2. 種族
 
+- [ ] 種族マスタを追加する（人間 / ゴブリン / コボルト / オーク / アンデッド / リザードマン）
+- [ ] プレイヤー陣営は人間のみに限定する（v1）
+- [ ] 種族ごとの傾向・活動エリア・伝承を定義する
+- [ ] 全種族のキャラを雇用市場に流通させる
+
+### D-3. 外交・友好度
+
+- [ ] 友好度を保持する（家門↔NPC家門 / 家門↔種族 / 血盟↔NPC家門・種族）
+- [ ] 行動による友好度変動（±5〜30、時間減衰なし）を実装する
+- [ ] 外交状態の閾値判定を実装する（敵対 -100〜-30 / 中立 / 友好 +30〜+80 / 同盟 +80〜）
+- [ ] 友好度で解禁される内容を実装する（+30 交易割引 / +50 共同クエスト / +70 特殊装備 / +90 血盟申請）
+
+### D-4. 目的衝突とPvPvE遭遇
+
+- [ ] クエストタイプを実装する（防衛 / 調査 / 討伐 / 護衛 / 交易 / 採取）
+- [ ] 衝突ペアの意図的生成を実装する（プレイヤーの活動状況に応じて頻度調整）
+- [ ] 遭遇判定を実装する（同エリア + クエスト衝突 + 外交状態）
+- [ ] 遭遇の回避・会話・逃走の選択肢を実装する
+- [ ] 敵パーティを目的に応じた編成で生成する（既存: `StartPartyBattleAction` の敵生成を拡張）
+
+### D-5. ダンジョン
+
+- [ ] ダンジョンを5エリア構成で実装する（深いほど敵が強く、報酬が上がる）
+- [ ] エリア単位の攻略（1エリア3〜8分の戦闘、深部は連戦）を実装する
+- [ ] 到達エリアの解放状態を家門ごとに保持する
+- [ ] エリアごとのリスク選択と予測情報表示を実装する
+- [ ] 仮想マップと座標イベントの設計を行う（選択肢移動 / 座標へのイベント登録 / 戦闘・宝箱・会話・罠・特殊移動）
+  - → 詳細設計は `arena_v1_content_map_ja.md`（未作成）へ切り出す。未確定事項に記載。
+- [ ] 深部の秘宝到達フローを実装する（Phase E と連動）
+
+### D-6. アリーナ
+
+- [ ] 戦力スコア（ステータス + 装備）の算出を実装する
+- [ ] 戦力スコアによるランク帯マッチングを実装する（プレイヤー/NPCを区別しない）
+- [ ] 練習戦とランク戦の2モードを実装する（ランク戦は参戦コスト100G）
+- [ ] 勝利スコア式を実装する（勝敗 + 撃破数 + 残り時間 + 与ダメ − 被ダメ）
+- [ ] 勝利スコアのシーズンリセットとランキング配布を実装する
+
+---
+
+## Phase E 血盟・シーズン・痕跡
+
+> 参照: `arena_v1_living_world_scope_ja.md` §5・§7、`arena_v1_season_scope_ja.md` 全体
+
+### E-1. 血盟
+
+- [ ] 血盟を実装する（盟主家門 / 幹事家門 / 加盟家門 / 加盟NPC家門）→ `Pages/BloodPact` のダミー画面を置換
+- [ ] 血盟Lvと最大家門数（v1初期20）を実装する
+- [ ] 権限設計を実装する（外交権 / 資源管理権 / 出撃指示権 / 加盟承認権 / 情報閲覧権）
+- [ ] 家門の共同運営権限（1家門を複数プレイヤーで操作）を実装する
+- [ ] 血盟資源を実装する（血盟Gold / 血盟素材 / 血盟名誉）と活動スコアによる利用上限
+- [ ] NPC家門の自動参加申請と脱退を実装する
+- [ ] 血盟戦を実装する（連合戦 / 拠点制圧・敵撤退・目標達成 / 血盟資源・領域支配・痕跡）
+
+### E-2. シーズン
+
+- [ ] シーズン管理を実装する（最大14日、序盤/中盤/終盤の構造）
+- [ ] 終了条件を実装する（秘宝到達 / 特定イベント / 14日経過の最速成立）
+- [ ] ワールドワイプ処理を実装する
+  - [ ] 消えるもの: 家門Gold・アイテム・装備 / キャラLv・ステ・装備 / 契約 / 血盟関係 / ダンジョン進行 / 友好度
+  - [ ] 残るもの: 家門名 / 称号・名誉 / 痕跡 / 初期Goldボーナス / 解放された職業・魔法 / 特殊な世界状態
+- [ ] 家門Lvは引き継がない（全員同じスタートライン）ことを保証する
+- [ ] シーズン進行の可視化（残り日数・世界イベント・秘宝到達状況）を提供する
+
+### E-3. 痕跡（Legacy）
+
+- [ ] 痕跡を4種類で記録する（英雄痕跡 / 家門痕跡 / 種族痕跡 / 世界痕跡）
+- [ ] 初期Goldボーナスを実装する（参加+1,500G / 主要痕跡1つ+500G / 最大+3,000G）
+- [ ] 痕跡ボーナスの逓減を実装する（1→2で+1,500G、2→3で+700G、3→4で+300G）
+- [ ] 称号・外見報酬を実装する
+- [ ] ロストしたキャラの名前と戦績を痕跡として残す
+
+### E-4. 創発的アンロック
+
+- [ ] 魔法解放の3段階を実装する（発見 → 限定解放 → 世界解放）
+- [ ] 古代の碑文の発見イベントを実装する（1〜3家門）
+- [ ] 「歴史に名を残すイベント」を実装する（魔法でボス討伐 / アリーナ頂点 / 古代の儀式達成）
+- [ ] 術士系統の全体解放と、次シーズンへの初期状態継承を実装する
+- [ ] 他の創発アンロックを実装する（新職業 / 新エリア / 新交易ルート / 新種族陣営）
+
+### E-5. 秘宝
+
+- [ ] ダンジョン最深部に秘宝を配置する
+- [ ] 秘宝到達によるシーズン終了と勝者記録を実装する
+- [ ] 勝者の種族に有利な次シーズン初期状態を反映する
+- [ ] 個人プレイヤーの勝ち筋（血盟所属 / 貢献 / 交易・傭兵・支援）を痕跡として記録する
+
+---
+
+## Phase F UI
+
+> 参照: `arena_v1_ui_scope_ja.md` §7 の優先順（Phase1 → Phase2 → Phase3）
+
+### F-1. UI Phase 1（必須10画面）
+
+- [ ] 1. タイトル/ログイン（家門名・シーズン残日数・お知らせ）（既存: `Pages/Home/Guest.vue` を拡張）
+- [ ] 2. 家門ダッシュボード（現在の活動 / パーティ / お知らせ / クイックアクション / シーズン進行）（既存: `Pages/House/Mine.vue` を拡張）
+- [ ] 3. キャラクター一覧/詳細（6ステ・派生ステ・装備・スキル・職業系統グラフ・契約・履歴）（既存: `Pages/Character/*` を拡張）
+- [ ] 4. パーティ編成（5スロット / 戦術設定 / 個別上書き / リスク選択 / 出撃先 / 予測情報）（既存: `Pages/Party/Edit.vue` を拡張）
+- [ ] 5. 出撃選択（アリーナ: ランク帯・ランキング・参戦費 / ダンジョン: エリア・目的・リスク・予測）（既存: `Pages/PartyBattle/Select.vue` を拡張）
+- [ ] 6. 戦闘中画面（俯瞰フィールド / 円形ATBゲージ / 行動方針 / 撤退UI / 戦闘ログ / 倍速・一時停止 / カメラ切替）（既存: `Pages/PartyBattle/Show.vue` を拡張）
+- [ ] 7. 戦闘結果（報酬 / キャラ状態 / 装備劣化 / ロスト報告 / 次のアクション）（既存: `Pages/PartyBattle/Result.vue` を拡張）
+- [ ] 8. 市場（カテゴリタブ / 出品一覧 / 検索 / 出品 / 購入 / 履歴 / NPC商店タブ）→ `Pages/Market/Index.vue` のダミーを本実装に置換
+- [ ] 9. 生産/工房（生産スキル選択 / キャラ割り当て / レシピ / 生産キュー / 受け取り）（既存: `Pages/Production/Index.vue` を拡張）
+- [ ] 10. 設定（音量 / 通知 / チュートリアルリセット）→ `Pages/Settings/Index.vue` のダミーを本実装に置換
+
+### F-2. UI Phase 2
+
+- [ ] 11. ランキング / 痕跡（アリーナ / 到達深度 / 家門 / 世界の伝説 / 自分の痕跡）
+- [ ] 12. 血盟画面 → `Pages/BloodPact/Index.vue` のダミーを本実装に置換
+- [ ] 13. 外交画面（友好度ゲージ / 関係の理由 / 同盟申請）
+- [ ] 14. 郵便（宅配）
+
+### F-3. UI Phase 3
+
+- [ ] 15. チャット/掲示板
+- [ ] 16. シーズン終了/ワールドワイプ演出
+- [ ] 17. 詳細なチュートリアル（オンボーディング）
+- [ ] 18. 外見/称号カスタマイズ
+
+### F-4. 共通UIと演出
+
+- [ ] トップバー（家門名 / Lv / Gold / 資産 / 通知 / 設定）を全画面共通化する
+- [ ] ボトムナビゲーション（ホーム / 出撃 / 市場 / 生産 / 血盟）をモバイル向けに実装する
+- [ ] ツールチップ/ヘルプ（擬似確率・リスク・劣化などの独自システムの説明）を追加する
+- [ ] 確認ダイアログ（高リスク出撃 / 解雇 / 高額取引 / 血盟脱退）を追加する
+- [ ] ダメージ数値のフローティング表示（通常 / クリティカル / Miss / 弱点色）を実装する
+- [ ] スキル名・バフ/デバフアイコンの表示を実装する
+- [ ] キャラクターアイコン画像を表示する（`/images/characters/icons`）
+- [ ] タイトルロゴ・バージョン表示・コピーライトを追加する
+- [ ] 戦闘/レベルアップ/報酬獲得の演出とサウンドを追加する
+
+### F-5. 既知の不具合・負債（UI周辺）
+
+- [ ] プロフィール画面が Laravel デフォルトのままなのでデザインを統一する
+- [ ] ゲストのプロフィール表示を無しにする（アカウント削除ができてしまう）
+- [ ] ログアウトができない不具合を直す
+- [ ] 「求職中」などの文言を game らしい表現に見直す
+- [ ] 多言語対応（後回し。文言のリソース化だけ先に検討）
+
+---
+
+## 横断タスク（各フェーズと並行）
+
+- [ ] メンテナンスモードを実装する（完全停止 / 運営キャラのみプレイ可能）
+- [ ] ログインボーナスと初心者成長クエストを実装する（経済スコープのフォーセットとして扱う）
+- [ ] マスタデータAPI（`/api/master`）を新スキーマに追従させる
+- [ ] 各フェーズのユニット/フィーチャーテストを維持し、全テスト緑を保つ
+- [ ] `README.md` を新仕様に合わせて更新する
+
+---
+
+## 要協議の未確定仕様
+
+> 各スコープ文書末尾の「未確定事項」のうち、**まだ決まっていないもの**を集約。
+> 着手前にここを埋める。決まったら該当スコープ文書の本文へ反映し、本節から削除する。
+
+### U-1. ワールドバンクの技術実装粒度
+
+- 出典: `arena_vision_ja.md` §12[G]、`arena_v1_economy_scope_ja.md` §2
+- 論点: グローバルなシンク/フォーセットの管理単位をどうするか。
+  - 総量集計の対象は Gold のみか、主要アイテムも含めるか。
+  - 集計はテーブル集計かカウンタテーブルか（性能とのトレードオフ）。
+  - 調整レバーの適用単位（サーバ全体 / エリア別 / 家門別）。
+  - 移動平均の窓幅と補正の上限（急変を避けるためのクランプ幅）。
+
+### U-2. 血盟/拠点維持費の計算式
+
+- 出典: `arena_v1_economy_scope_ja.md` §3.3・§12[E]、`arena_v1_living_world_scope_ja.md` §5
+- 論点: 血盟規模・血盟Lv・施設数に対する維持費の式。徴収周期（日次/週次）と、支払えない場合の挙動（施設停止/自動解散）。
+
+### U-3. シーズンの「特定イベント」終了条件・イベント頻度・途中参加者
+
+- 出典: `arena_v1_season_scope_ja.md` §10[C][F][G]
+- 論点:
+  - 期間上限以外の特殊終了条件の具体例（例: 全種族の同盟成立）とその判定式。
+  - シーズン中の世界イベントの発生頻度とスケジューリング方式。
+  - シーズン途中参加者・前シーズン不参加者のキャッチアップ設計（初期ボーナスの扱い）。
+  - ワイプ演出の要否と実装優先度（`arena_v1_season_scope_ja.md` §10[H]）。
+
+### U-4. キャラの死亡ロスト/逃亡の発生条件と忠誠度モデル
+
+- 出典: `arena_vision_ja.md` §12[C]、`arena_v1_core_loop_ja.md` §5.4
+- 論点:
+  - 死亡確率の具体式（レベル差 / 戦闘時間 / 深度 / 戦闘不能数 / 装備状態の重み付け）。
+  - 逃亡の発生条件（忠誠度の下限、性格の影響、待遇＝報酬・勝率・負傷頻度の反映式）。
+  - 忠誠度をどうモデル化するか（数値パラメータか、イベント判定か）。
+  - ロスト装備の現地回収が可能なケース/不可能なケースの切り分け。
+
+### U-5. ダンジョンの仮想マップ/座標イベント設計
+
+- 出典: 旧 `todo.md`「ダンジョンについて」、`arena_v1_living_world_scope_ja.md` §11
+- 論点（新規文書 `arena_v1_content_map_ja.md` に切り出す想定）:
+  - 仮想マップの内部表現（グリッド座標 / ノードグラフ）。
+  - 移動の選択肢（左の道 / 奥へ / 右の道 / 引き返す / 帰還）とエリア5構成との対応。
+  - 座標へのイベント登録方式（静的配置 / 動的生成 / 他家門の座標衝突）。
+  - イベント種別（戦闘 / 宝箱 / NPC会話 / 罠 / 特殊移動）と発動タイミング。
+  - 戦闘回避（逃走・会話）の判定と、複数敵・非モンスター敵の扱い。
+
+### U-6. 6基本ステ名称の不整合
+
+- 出典: `arena_v1_combat_scope_ja.md` §2.4 と §5.1
+- 論点: §2.4 は STR / AGI / VIT / INT / **FOC** / **SPI** を定義しているが、§5.1 の職業別主要ステでは **CON / WIS / DEX** が混在している。
+  - どちらの名称に統一するか（本 todo は §2.4 の6ステを前提に記述）。
+  - 統一後、§5.1 の主要ステ表を書き換える（例: 衛士 = VIT、弓手 = AGI/FOC、僧侶 = INT/SPI）。
+  - 現行実装の `dex` / `int_stat` からの移行方針（カラム改名 or 新カラム追加 + データ移行）。
+
+### U-7. その他（優先度低・後続で協議）
+
+- モバイル対応の具体レベル（`arena_v1_ui_scope_ja.md` §8[B]）
+- 通知の種類と頻度、チャット/コミュニケーションUIの有無（同 §8[D][E]）
+- チュートリアルの形式と設定可能なUI項目（同 §8[F][G]）
+- 「NPCと区別がつかない」の実装深度（`arena_vision_ja.md` §12[B]）
+- マネタイズ / プラットフォーム（同 §12[H]）
+- 前シーズンの痕跡ボーナス額の上限許容範囲（`arena_v1_economy_scope_ja.md` §12[F]）
+
+---
+
+## プロトタイプ期の完了記録（v1.0 〜 v1.2.1）
+
+> 旧「ステップ0〜33」は完了済みのため、成果のみを要約して残す。
+> 詳細は `arena_v1_1_scope_ja.md` / `arena_v1_2_scope_ja.md` / `README.md` を参照。
+
+- v1.0: Docker Compose + Laravel + Inertia/Vue3 + Tailwind 環境、3すくみ1v1バトル（開始/1ターン解決/勝敗/再戦）、`action_token` による二重送信防止。
+- v1.1: 家門・雇用モデル（`houses` / `characters` / 求職者プール / ゲスト雇用 / 報酬分配）。
+- v1.2: 基本ステ4種と派生ステ、EXP/レベルアップ、成長プリセット。
+- v1.2.1: 成長プリセットのランク体系化（各職5ランク + ランク抽選箱）。
+- 追加分: パーティ戦（`parties` / `party_battles` / ATB戦闘状態）、スキル（`skills` / `character_skills`）、生産（`ProductionService`）。
+
+> これらはすべて**変更可能な種**であり、本 todo の各フェーズで採用/改造/削除を判断する。
